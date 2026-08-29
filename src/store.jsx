@@ -66,10 +66,9 @@ export function MoochaProvider({ children }) {
 
   const fetchMenuData = useCallback(async () => {
     if (!sb) return getLocal('demo_menu', DEFAULT_MENU);
-    const { data, error } = await sb.from('menu').select('*').eq('id', 'main').single();
+    const { data, error } = await sb.rpc('get_menu');
     if (error) { noteSupabaseError('Loading menu', error); return DEFAULT_MENU; }
-    if (!data) return DEFAULT_MENU;
-    return data.data;
+    return data || DEFAULT_MENU;
   }, [noteSupabaseError]);
 
   const fetchCustomers = useCallback(async () => {
@@ -79,11 +78,99 @@ export function MoochaProvider({ children }) {
     return data;
   }, [noteSupabaseError]);
 
-  const persistMenu = useCallback(async (nextMenu) => {
-    if (!sb) { setLocal('demo_menu', nextMenu); return; }
-    const { error } = await sb.from('menu').update({ data: nextMenu }).eq('id', 'main');
-    if (error) noteSupabaseError('Saving menu', error);
-  }, [noteSupabaseError]);
+  // ---------------- menu editing (admin) ----------------
+  // The menu lives in real relational tables (categories/items/item_milks/
+  // item_toppings/item_sugar_levels) — each of these does one targeted
+  // write instead of the old "rewrite the entire catalog blob" pattern.
+  // Demo mode (no sb) has no real backend, so it keeps mutating the local
+  // {categories: {name: [items]}} tree directly, same as before.
+  const menuAddCategory = useCallback(async (name) => {
+    if (!sb) {
+      const next = { categories: { ...menu.categories } };
+      if (!next.categories[name]) next.categories[name] = [];
+      setMenu(next); setLocal('demo_menu', next);
+      return;
+    }
+    const { error } = await sb.from('categories').insert({ id: 'cat_' + Date.now(), name, sort_order: Date.now() });
+    if (error) { noteSupabaseError('Adding category', error); return; }
+    setMenu(await fetchMenuData());
+  }, [sb, menu, noteSupabaseError, fetchMenuData]);
+
+  const menuDeleteCategory = useCallback(async (name) => {
+    if (!sb) {
+      const next = { categories: { ...menu.categories } };
+      delete next.categories[name];
+      setMenu(next); setLocal('demo_menu', next);
+      return;
+    }
+    const { error } = await sb.from('categories').delete().eq('name', name);
+    if (error) { noteSupabaseError('Deleting category', error); return; }
+    setMenu(await fetchMenuData());
+  }, [sb, menu, noteSupabaseError, fetchMenuData]);
+
+  const menuToggleSoldout = useCallback(async (cat, id) => {
+    if (!sb) {
+      const next = { categories: { ...menu.categories } };
+      next.categories[cat] = next.categories[cat].map(i => i.id === id ? { ...i, soldout: !i.soldout } : i);
+      setMenu(next); setLocal('demo_menu', next);
+      return;
+    }
+    const current = menu.categories[cat]?.find(i => i.id === id);
+    const { error } = await sb.from('items').update({ soldout: !current?.soldout }).eq('id', id);
+    if (error) { noteSupabaseError('Updating item', error); return; }
+    setMenu(await fetchMenuData());
+  }, [sb, menu, noteSupabaseError, fetchMenuData]);
+
+  const menuDeleteItem = useCallback(async (cat, id) => {
+    if (!sb) {
+      const next = { categories: { ...menu.categories } };
+      next.categories[cat] = next.categories[cat].filter(i => i.id !== id);
+      setMenu(next); setLocal('demo_menu', next);
+      return;
+    }
+    const { error } = await sb.from('items').delete().eq('id', id);
+    if (error) { noteSupabaseError('Deleting item', error); return; }
+    setMenu(await fetchMenuData());
+  }, [sb, menu, noteSupabaseError, fetchMenuData]);
+
+  const menuMoveItem = useCallback(async (cat, id, dir) => {
+    const items = menu.categories[cat] || [];
+    const i = items.findIndex(x => x.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= items.length) return;
+    const reordered = [...items];
+    [reordered[i], reordered[j]] = [reordered[j], reordered[i]];
+
+    if (!sb) {
+      const next = { categories: { ...menu.categories, [cat]: reordered } };
+      setMenu(next); setLocal('demo_menu', next);
+      return;
+    }
+    const results = await Promise.all(reordered.map((it, idx) => sb.from('items').update({ sort_order: idx }).eq('id', it.id)));
+    const failed = results.find(r => r.error);
+    if (failed) { noteSupabaseError('Reordering menu', failed.error); return; }
+    setMenu(await fetchMenuData());
+  }, [sb, menu, noteSupabaseError, fetchMenuData]);
+
+  const menuSaveItem = useCallback(async ({ id, category, name, desc, price, iced, soldout, photo, icon, milks, toppings, sugarLevels }) => {
+    if (!sb) {
+      const next = { categories: { ...menu.categories } };
+      for (const c in next.categories) next.categories[c] = next.categories[c].filter(i => i.id !== id);
+      if (!next.categories[category]) next.categories[category] = [];
+      const newItem = { id, name, desc, price, iced, soldout: soldout || false, milks, toppings, sugarLevels };
+      if (photo) newItem.photo = photo; else newItem.icon = icon || 'matcha';
+      next.categories[category] = [...next.categories[category], newItem];
+      setMenu(next); setLocal('demo_menu', next);
+      return;
+    }
+    const { error } = await sb.rpc('save_menu_item', {
+      p_id: id, p_category: category, p_name: name, p_desc: desc, p_price: price,
+      p_iced: iced, p_photo: photo || null, p_icon: photo ? null : (icon || 'matcha'),
+      p_milks: milks, p_toppings: toppings, p_sugar_levels: sugarLevels,
+    });
+    if (error) { noteSupabaseError('Saving item', error); return; }
+    setMenu(await fetchMenuData());
+  }, [sb, menu, noteSupabaseError, fetchMenuData]);
 
   const persistSettings = useCallback(async (nextSettings) => {
     if (!sb) { setLocal('demo_settings', nextSettings); return; }
@@ -285,7 +372,8 @@ export function MoochaProvider({ children }) {
     toast, showToast,
     // backend actions
     fetchOrders, fetchSettings, fetchMenuData, fetchCustomers,
-    persistMenu, persistSettings, insertOrder, deleteOrder,
+    menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuDeleteItem, menuMoveItem, menuSaveItem,
+    persistSettings, insertOrder, deleteOrder,
     bumpCustomerStamp, setCustomerStamps, deleteCustomerRecord,
     checkStaffPassphrase, changeStaffPassphrase,
     noteSupabaseError,

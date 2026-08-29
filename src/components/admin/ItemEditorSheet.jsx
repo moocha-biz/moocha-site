@@ -45,7 +45,7 @@ function RowsEditor({ label, rows, setRows, withPrice, addLabel, emptyNote }) {
 }
 
 export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
-  const { sb, menu, setMenu, persistMenu, showToast } = useMoocha();
+  const { sb, menuSaveItem, showToast } = useMoocha();
   const [name, setName] = useState(item?.name || '');
   const [desc, setDesc] = useState(item?.desc || '');
   const [price, setPrice] = useState(item ? item.price : '');
@@ -90,22 +90,12 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
     const cleanToppings = toppings.filter(t => (t.name || '').trim()).map(t => ({ id: t.id, name: t.name.trim(), price: t.price || 0 }));
     const cleanSugarLevels = sugarLevels.map(s => s.trim()).filter(Boolean);
 
-    const nextMenu = { categories: { ...menu.categories } };
-    for (const c in nextMenu.categories) nextMenu.categories[c] = [...nextMenu.categories[c]];
-    if (item) nextMenu.categories[cat] = nextMenu.categories[cat].filter(i => i.id !== item.id);
-    if (!nextMenu.categories[trimmedCat]) nextMenu.categories[trimmedCat] = [];
-
-    const newItem = {
+    await menuSaveItem({
       id: item ? item.id : ('i' + Date.now()),
-      name: trimmedName, desc: desc.trim(), price: parseFloat(price) || 0, iced,
-      soldout: item ? item.soldout : false,
+      category: trimmedCat, name: trimmedName, desc: desc.trim(), price: parseFloat(price) || 0, iced,
+      soldout: item ? item.soldout : false, photo: photoUrl,
       milks: cleanMilks, toppings: cleanToppings, sugarLevels: cleanSugarLevels,
-    };
-    if (photoUrl) newItem.photo = photoUrl; else newItem.icon = 'matcha';
-    nextMenu.categories[trimmedCat].push(newItem);
-
-    setMenu(nextMenu);
-    await persistMenu(nextMenu);
+    });
     onSaved?.();
     onClose();
   };

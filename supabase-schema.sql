@@ -14,100 +14,167 @@ create table if not exists settings (
 );
 insert into settings (id) values ('main') on conflict (id) do nothing;
 
-create table if not exists menu (
-  id text primary key default 'main',
-  data jsonb not null
+-- The menu is real relational tables, not a single jsonb blob — every
+-- edit used to read+rewrite the entire catalog as one JSON document.
+-- get_menu() below reassembles the same {categories: {name: [items]}}
+-- shape the frontend expects, so no component code needs to know.
+create table if not exists categories (
+  id text primary key,
+  name text not null unique,
+  sort_order integer not null default 0
 );
-insert into menu (id, data) values ('main', '{
-  "categories": {
-    "Matcha Drinks": [
-      {"id":"m1","name":"Matcha Latte","desc":"Our everyday matcha, whisked with fresh milk.","price":6.00,"iced":true,"soldout":false,"icon":"matcha",
-        "milks":[{"id":"milk1","name":"Fresh milk","price":0},{"id":"milk2","name":"Oat milk","price":0.80},{"id":"milk3","name":"Soy milk","price":0.60}],
-        "toppings":[{"id":"top1","name":"Extra matcha shot","price":1.50},{"id":"top2","name":"Pearls","price":0.80}]},
-      {"id":"m2","name":"Strawberry Matcha","desc":"Layered strawberry puree with ceremonial matcha.","price":7.00,"iced":true,"soldout":false,"icon":"strawberry",
-        "milks":[{"id":"milk1","name":"Fresh milk","price":0},{"id":"milk2","name":"Oat milk","price":0.80}],
-        "toppings":[{"id":"top1","name":"Extra matcha shot","price":1.50},{"id":"top2","name":"Pearls","price":0.80},{"id":"top3","name":"Grass jelly","price":0.80}]},
-      {"id":"m3","name":"Sea Salt Foam Matcha","desc":"Matcha topped with a whisked sea salt cream foam.","price":7.00,"iced":true,"soldout":false,"photo":"assets/sea-salt-matcha.jpg",
-        "milks":[{"id":"milk1","name":"Fresh milk","price":0},{"id":"milk3","name":"Soy milk","price":0.60}],
-        "toppings":[{"id":"top1","name":"Extra matcha shot","price":1.50}]},
-      {"id":"m4","name":"Biscoff Matcha","desc":"Matcha and biscoff caramel, swirled together.","price":7.50,"iced":true,"soldout":false,"photo":"assets/biscoff-matcha.jpg",
-        "milks":[{"id":"milk1","name":"Fresh milk","price":0},{"id":"milk2","name":"Oat milk","price":0.80}],
-        "toppings":[]}
-    ],
-    "Seasonal Bakes": []
-  }
-}'::jsonb) on conflict (id) do nothing;
 
--- Migrates an older flat menu (from before categories/milk/toppings existed
--- in their current form) into today's shape. Safe to run any time, even if
--- you're already fully up to date — each step only acts when needed.
-do $$
+create table if not exists items (
+  id text primary key,
+  category_id text not null references categories(id) on delete cascade,
+  name text not null,
+  "desc" text not null default '',
+  price numeric not null default 0,
+  iced boolean not null default false,
+  soldout boolean not null default false,
+  icon text,
+  photo text,
+  sort_order integer not null default 0
+);
+create index if not exists items_category_id_idx on items(category_id);
+
+create table if not exists item_milks (
+  item_id text not null references items(id) on delete cascade,
+  id text not null,
+  name text not null,
+  price numeric not null default 0,
+  sort_order integer not null default 0,
+  primary key (item_id, id)
+);
+
+create table if not exists item_toppings (
+  item_id text not null references items(id) on delete cascade,
+  id text not null,
+  name text not null,
+  price numeric not null default 0,
+  sort_order integer not null default 0,
+  primary key (item_id, id)
+);
+
+create table if not exists item_sugar_levels (
+  item_id text not null references items(id) on delete cascade,
+  level text not null,
+  sort_order integer not null default 0,
+  primary key (item_id, sort_order)
+);
+
+insert into categories (id, name, sort_order) values
+  ('cat_matcha', 'Matcha Drinks', 0),
+  ('cat_seasonal', 'Seasonal Bakes', 1)
+on conflict (id) do nothing;
+
+insert into items (id, category_id, name, "desc", price, iced, soldout, icon, photo, sort_order) values
+  ('m1', 'cat_matcha', 'Matcha Latte', 'Our everyday matcha, whisked with fresh milk.', 6.00, true, false, 'matcha', null, 0),
+  ('m2', 'cat_matcha', 'Strawberry Matcha', 'Layered strawberry puree with ceremonial matcha.', 7.00, true, false, 'strawberry', null, 1),
+  ('m3', 'cat_matcha', 'Sea Salt Foam Matcha', 'Matcha topped with a whisked sea salt cream foam.', 7.00, true, false, null, 'assets/sea-salt-matcha.jpg', 2),
+  ('m4', 'cat_matcha', 'Biscoff Matcha', 'Matcha and biscoff caramel, swirled together.', 7.50, true, false, null, 'assets/biscoff-matcha.jpg', 3)
+on conflict (id) do nothing;
+
+insert into item_milks (item_id, id, name, price, sort_order) values
+  ('m1', 'milk1', 'Fresh milk', 0, 0), ('m1', 'milk2', 'Oat milk', 0.80, 1), ('m1', 'milk3', 'Soy milk', 0.60, 2),
+  ('m2', 'milk1', 'Fresh milk', 0, 0), ('m2', 'milk2', 'Oat milk', 0.80, 1),
+  ('m3', 'milk1', 'Fresh milk', 0, 0), ('m3', 'milk3', 'Soy milk', 0.60, 1),
+  ('m4', 'milk1', 'Fresh milk', 0, 0), ('m4', 'milk2', 'Oat milk', 0.80, 1)
+on conflict (item_id, id) do nothing;
+
+insert into item_toppings (item_id, id, name, price, sort_order) values
+  ('m1', 'top1', 'Extra matcha shot', 1.50, 0), ('m1', 'top2', 'Pearls', 0.80, 1),
+  ('m2', 'top1', 'Extra matcha shot', 1.50, 0), ('m2', 'top2', 'Pearls', 0.80, 1), ('m2', 'top3', 'Grass jelly', 0.80, 2),
+  ('m3', 'top1', 'Extra matcha shot', 1.50, 0)
+on conflict (item_id, id) do nothing;
+
+-- get_menu(): reassembles {categories: {name: [items...]}} in one
+-- round trip, matching what src/components/ already expects.
+create or replace function get_menu()
+returns jsonb
+language sql
+stable
+as $$
+  select jsonb_build_object('categories', coalesce(jsonb_object_agg(cat.name, cat.items order by cat.sort_order), '{}'::jsonb))
+  from (
+    select c.id, c.name, c.sort_order,
+      coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', it.id, 'name', it.name, 'desc', it."desc", 'price', it.price,
+            'iced', it.iced, 'soldout', it.soldout, 'icon', it.icon, 'photo', it.photo,
+            'milks', coalesce(mk.milks, '[]'::jsonb),
+            'toppings', coalesce(tp.toppings, '[]'::jsonb),
+            'sugarLevels', coalesce(sg.levels, '[]'::jsonb)
+          ) order by it.sort_order
+        ) filter (where it.id is not null),
+        '[]'::jsonb
+      ) as items
+    from categories c
+    left join items it on it.category_id = c.id
+    left join lateral (
+      select jsonb_agg(jsonb_build_object('id', m.id, 'name', m.name, 'price', m.price) order by m.sort_order) as milks
+      from item_milks m where m.item_id = it.id
+    ) mk on true
+    left join lateral (
+      select jsonb_agg(jsonb_build_object('id', t.id, 'name', t.name, 'price', t.price) order by t.sort_order) as toppings
+      from item_toppings t where t.item_id = it.id
+    ) tp on true
+    left join lateral (
+      select jsonb_agg(s.level order by s.sort_order) as levels
+      from item_sugar_levels s where s.item_id = it.id
+    ) sg on true
+    group by c.id, c.name, c.sort_order
+  ) cat;
+$$;
+
+-- save_menu_item(): one round trip for the admin item editor — resolves
+-- or creates the category by name, upserts the item, and replaces its
+-- milk/topping/sugar-level rows, all in one transaction.
+create or replace function save_menu_item(
+  p_id text, p_category text, p_name text, p_desc text, p_price numeric,
+  p_iced boolean, p_photo text, p_icon text,
+  p_milks jsonb, p_toppings jsonb, p_sugar_levels jsonb
+) returns void
+language plpgsql
+as $$
 declare
-  old_data jsonb;
+  v_category_id text;
+  v_next_sort integer;
 begin
-  -- Step 1: an even older shape had categories directly at the root with
-  -- no "categories" wrapper at all. Wrap it if that's what we find.
-  select data into old_data from menu where id = 'main';
-  if old_data is not null and not (old_data ? 'categories') then
-    update menu set data = jsonb_build_object('categories', old_data) where id = 'main';
+  select id into v_category_id from categories where name = p_category;
+  if v_category_id is null then
+    select coalesce(max(sort_order), -1) + 1 into v_next_sort from categories;
+    v_category_id := 'cat_' || md5(p_category || clock_timestamp()::text);
+    insert into categories (id, name, sort_order) values (v_category_id, p_category, v_next_sort);
   end if;
-end $$;
 
-do $$
-declare
-  old_data jsonb;
-  cat_key text;
-  item jsonb;
-  new_items jsonb;
-  new_categories jsonb := '{}'::jsonb;
-  milk_pool jsonb;
-  addon_pool jsonb;
-  new_milks jsonb;
-  new_toppings jsonb;
-begin
-  -- Step 2: a middle shape kept a shared "milkOptions"/"addOns" pool at the
-  -- root, with each item referencing them by id ("milkIds"/"addOnIds").
-  -- Milk/toppings are now fully custom per drink, stored inline on the item
-  -- itself — so fold each item's referenced pool entries directly into it.
-  select data into old_data from menu where id = 'main';
-  if old_data is not null and old_data ? 'milkOptions' then
-    milk_pool := coalesce(old_data->'milkOptions', '[]'::jsonb);
-    addon_pool := coalesce(old_data->'addOns', '[]'::jsonb);
-
-    for cat_key in select jsonb_object_keys(old_data->'categories') loop
-      new_items := '[]'::jsonb;
-      for item in select * from jsonb_array_elements(old_data->'categories'->cat_key) loop
-        if item ? 'milkIds' then
-          select coalesce(jsonb_agg(jsonb_build_object('id', m->>'id', 'name', m->>'name', 'price', (m->>'price')::numeric)), '[]'::jsonb)
-            into new_milks
-            from jsonb_array_elements(milk_pool) m
-            where (m->>'id') in (select jsonb_array_elements_text(item->'milkIds'));
-        else
-          select coalesce(jsonb_agg(jsonb_build_object('id', m->>'id', 'name', m->>'name', 'price', (m->>'price')::numeric)), '[]'::jsonb)
-            into new_milks
-            from jsonb_array_elements(milk_pool) m;
-        end if;
-
-        if item ? 'addOnIds' then
-          select coalesce(jsonb_agg(jsonb_build_object('id', a->>'id', 'name', a->>'name', 'price', (a->>'price')::numeric)), '[]'::jsonb)
-            into new_toppings
-            from jsonb_array_elements(addon_pool) a
-            where (a->>'id') in (select jsonb_array_elements_text(item->'addOnIds'));
-        else
-          select coalesce(jsonb_agg(jsonb_build_object('id', a->>'id', 'name', a->>'name', 'price', (a->>'price')::numeric)), '[]'::jsonb)
-            into new_toppings
-            from jsonb_array_elements(addon_pool) a;
-        end if;
-
-        item := (item - 'milkIds' - 'addOnIds') || jsonb_build_object('milks', new_milks, 'toppings', new_toppings);
-        new_items := new_items || jsonb_build_array(item);
-      end loop;
-      new_categories := new_categories || jsonb_build_object(cat_key, new_items);
-    end loop;
-
-    update menu set data = jsonb_build_object('categories', new_categories) where id = 'main';
+  if exists (select 1 from items where id = p_id) then
+    update items set category_id = v_category_id, name = p_name, "desc" = p_desc, price = p_price,
+      iced = p_iced, photo = p_photo, icon = p_icon
+      where id = p_id;
+  else
+    select coalesce(max(sort_order), -1) + 1 into v_next_sort from items where category_id = v_category_id;
+    insert into items (id, category_id, name, "desc", price, iced, soldout, photo, icon, sort_order)
+      values (p_id, v_category_id, p_name, p_desc, p_price, p_iced, false, p_photo, p_icon, v_next_sort);
   end if;
-end $$;
+
+  delete from item_milks where item_id = p_id;
+  insert into item_milks (item_id, id, name, price, sort_order)
+    select p_id, mk->>'id', mk->>'name', coalesce((mk->>'price')::numeric, 0), ord - 1
+    from jsonb_array_elements(p_milks) with ordinality as t(mk, ord);
+
+  delete from item_toppings where item_id = p_id;
+  insert into item_toppings (item_id, id, name, price, sort_order)
+    select p_id, tp->>'id', tp->>'name', coalesce((tp->>'price')::numeric, 0), ord - 1
+    from jsonb_array_elements(p_toppings) with ordinality as t(tp, ord);
+
+  delete from item_sugar_levels where item_id = p_id;
+  insert into item_sugar_levels (item_id, level, sort_order)
+    select p_id, sg.value #>> '{}', ord - 1
+    from jsonb_array_elements(p_sugar_levels) with ordinality as t(sg, ord);
+end;
+$$;
 
 -- Storage bucket for drink thumbnail photos, uploaded from the staff Menu
 -- editor. Public so the customer app can display them directly.
@@ -196,7 +263,11 @@ $$;
 
 -- Row Level Security
 alter table settings enable row level security;
-alter table menu enable row level security;
+alter table categories enable row level security;
+alter table items enable row level security;
+alter table item_milks enable row level security;
+alter table item_toppings enable row level security;
+alter table item_sugar_levels enable row level security;
 alter table orders enable row level security;
 alter table customers enable row level security;
 alter table staff_auth enable row level security;
@@ -207,6 +278,8 @@ alter table staff_auth enable row level security;
 
 grant execute on function check_staff_pin(text) to anon;
 grant execute on function set_staff_pin(text, text) to anon;
+grant execute on function get_menu() to anon;
+grant execute on function save_menu_item(text, text, text, text, numeric, boolean, text, text, jsonb, jsonb, jsonb) to anon;
 
 -- IMPORTANT: these policies are permissive (anyone with your public anon
 -- key can read and write orders/menu/settings). That's a normal trade-off
@@ -220,10 +293,30 @@ create policy "public read settings" on settings for select using (true);
 drop policy if exists "public update settings" on settings;
 create policy "public update settings" on settings for update using (true);
 
-drop policy if exists "public read menu" on menu;
-create policy "public read menu" on menu for select using (true);
-drop policy if exists "public update menu" on menu;
-create policy "public update menu" on menu for update using (true);
+drop policy if exists "public read categories" on categories;
+create policy "public read categories" on categories for select using (true);
+drop policy if exists "public write categories" on categories;
+create policy "public write categories" on categories for all using (true) with check (true);
+
+drop policy if exists "public read items" on items;
+create policy "public read items" on items for select using (true);
+drop policy if exists "public write items" on items;
+create policy "public write items" on items for all using (true) with check (true);
+
+drop policy if exists "public read item_milks" on item_milks;
+create policy "public read item_milks" on item_milks for select using (true);
+drop policy if exists "public write item_milks" on item_milks;
+create policy "public write item_milks" on item_milks for all using (true) with check (true);
+
+drop policy if exists "public read item_toppings" on item_toppings;
+create policy "public read item_toppings" on item_toppings for select using (true);
+drop policy if exists "public write item_toppings" on item_toppings;
+create policy "public write item_toppings" on item_toppings for all using (true) with check (true);
+
+drop policy if exists "public read item_sugar_levels" on item_sugar_levels;
+create policy "public read item_sugar_levels" on item_sugar_levels for select using (true);
+drop policy if exists "public write item_sugar_levels" on item_sugar_levels;
+create policy "public write item_sugar_levels" on item_sugar_levels for all using (true) with check (true);
 
 drop policy if exists "public read orders" on orders;
 create policy "public read orders" on orders for select using (true);
