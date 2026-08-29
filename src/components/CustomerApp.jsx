@@ -12,8 +12,9 @@ import CheckoutSheet from './CheckoutSheet.jsx';
 import PinModal from './PinModal.jsx';
 
 export default function CustomerApp({ onOpenAdmin }) {
-  const { tab, setTab, menu } = useMoocha();
+  const { tab, setTab, menu, showToast } = useMoocha();
   const [openItemId, setOpenItemId] = useState(null);
+  const [editLine, setEditLine] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
 
@@ -25,6 +26,13 @@ export default function CustomerApp({ onOpenAdmin }) {
     return null;
   };
   const openItem = findItem(openItemId);
+  const editItem = editLine ? findItem(editLine.itemId) : null;
+
+  const startEditLine = (line) => {
+    const found = findItem(line.itemId);
+    if (!found) { showToast('This item is no longer on the menu'); return; }
+    setEditLine(line);
+  };
 
   return (
     <div className="app-shell">
@@ -43,7 +51,7 @@ export default function CustomerApp({ onOpenAdmin }) {
 
         <main id="mainView">
           {tab === 'menu' && <MenuView onOpenItem={setOpenItemId} />}
-          {tab === 'cart' && <div className="mobile-only-cart"><CartView onCheckout={() => setCheckoutOpen(true)} /></div>}
+          {tab === 'cart' && <div className="mobile-only-cart"><CartView onCheckout={() => setCheckoutOpen(true)} onEditLine={startEditLine} /></div>}
           {tab === 'loyalty' && <LoyaltyView />}
         </main>
 
@@ -53,12 +61,16 @@ export default function CustomerApp({ onOpenAdmin }) {
       <aside className="cart-sidebar">
         <div className="cart-sidebar-inner">
           <div className="section-label" style={{ marginTop: 0 }}>Your order</div>
-          <CartView onCheckout={() => setCheckoutOpen(true)} />
+          <CartView onCheckout={() => setCheckoutOpen(true)} onEditLine={startEditLine} />
         </div>
       </aside>
 
       <Overlay show={!!openItem} onClose={() => setOpenItemId(null)}>
         {openItem && <ItemSheet item={openItem} onClose={() => setOpenItemId(null)} />}
+      </Overlay>
+
+      <Overlay show={!!editItem} onClose={() => setEditLine(null)}>
+        {editItem && <ItemSheet item={editItem} editLine={editLine} onClose={() => setEditLine(null)} />}
       </Overlay>
 
       <Overlay show={checkoutOpen} onClose={() => setCheckoutOpen(false)}>

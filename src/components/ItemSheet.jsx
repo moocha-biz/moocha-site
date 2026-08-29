@@ -3,13 +3,16 @@ import { useMoocha } from '../store.jsx';
 import { MODIFIERS, DEFAULT_SUGAR_LEVELS } from '../data/defaults.js';
 import { money } from '../lib/storage.js';
 
-export default function ItemSheet({ item, onClose }) {
-  const { addLineToCart, showToast } = useMoocha();
+export default function ItemSheet({ item, editLine, onClose }) {
+  const { addLineToCart, updateLine, showToast } = useMoocha();
   const milks = item.milks || [];
   const sugarLevels = (item.sugarLevels && item.sugarLevels.length) ? item.sugarLevels : DEFAULT_SUGAR_LEVELS;
   const toppings = item.toppings || [];
 
-  const [sel, setSel] = useState({
+  const [sel, setSel] = useState(() => editLine ? {
+    ice: editLine.ice, sugar: editLine.sugar, milk: editLine.milk, size: editLine.size,
+    addons: [...editLine.addons], qty: editLine.qty,
+  } : {
     ice: item.iced ? 'Normal ice' : null,
     sugar: sugarLevels.includes('50%') ? '50%' : sugarLevels[0],
     milk: milks[0] ? milks[0].name : null,
@@ -34,13 +37,20 @@ export default function ItemSheet({ item, onClose }) {
   })();
 
   const addToCart = () => {
-    addLineToCart({
-      lineId: Date.now() + Math.random(), itemId: item.id, name: item.name,
+    const line = {
+      itemId: item.id, name: item.name,
       ice: sel.ice, sugar: sel.sugar, milk: sel.milk, size: sel.size,
       addons: [...sel.addons], qty: sel.qty, lineTotal,
-    });
-    onClose();
-    showToast(`Added ${item.name} 🍵`);
+    };
+    if (editLine) {
+      updateLine(editLine.lineId, line);
+      onClose();
+      showToast(`Updated ${item.name} 🍵`);
+    } else {
+      addLineToCart({ lineId: Date.now() + Math.random(), ...line });
+      onClose();
+      showToast(`Added ${item.name} 🍵`);
+    }
   };
 
   const modRow = (key) => {
@@ -116,7 +126,7 @@ export default function ItemSheet({ item, onClose }) {
         <div className="qty-num">{sel.qty}</div>
         <button className="qty-btn" onClick={() => changeQty(1)}>+</button>
       </div>
-      <button className="btn-primary" onClick={addToCart}><span>Add to cart</span><span>{money(lineTotal)}</span></button>
+      <button className="btn-primary" onClick={addToCart}><span>{editLine ? 'Save changes' : 'Add to cart'}</span><span>{money(lineTotal)}</span></button>
     </>
   );
 }
