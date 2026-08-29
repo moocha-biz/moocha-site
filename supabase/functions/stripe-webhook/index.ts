@@ -14,7 +14,9 @@
 //
 // Then in the Stripe Dashboard, add a webhook endpoint pointing to:
 //   https://<your-project-ref>.supabase.co/functions/v1/stripe-webhook
-// listening for the "checkout.session.completed" event.
+// listening for these events:
+//   - checkout.session.completed  (payment succeeded)
+//   - checkout.session.expired    (PayNow QR timed out / was abandoned)
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import Stripe from "https://esm.sh/stripe@14?target=deno";
@@ -25,6 +27,15 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
+
+// deno-lint-ignore no-explicit-any
+function parseItems(raw: string | undefined): any[] {
+  try {
+    return JSON.parse(raw || "[]");
+  } catch (_e) {
+    return [];
+  }
+}
 
 Deno.serve(async (req) => {
   const signature = req.headers.get("stripe-signature");
@@ -46,8 +57,7 @@ Deno.serve(async (req) => {
     // deno-lint-ignore no-explicit-any
     const session = event.data.object as any;
     const meta = session.metadata || {};
-    let items = [];
-    try { items = JSON.parse(meta.items || "[]"); } catch (_e) { items = []; }
+    const items = parseItems(meta.items);
 
     const { error } = await supabase.from("orders").insert({
       id: meta.order_id || session.id,
@@ -85,6 +95,28 @@ Deno.serve(async (req) => {
           .insert({ phone: meta.phone, name: meta.name || "", stamps: 1 });
         if (insError) console.error("Failed to create customer stamp record:", insError);
       }
+    }
+  } else if (event.type === "checkout.session.expired") {
+    // The PayNow QR timed out (or the customer closed the tab) before
+    // paying. Nothing was ever written for this order, so record it as a
+    // failed attempt — the admin dashboard can then show it instead of it
+    // vanishing silently, and staff can follow up if needed.
+    // deno-lint-ignore no-explicit-any
+    const session = event.data.object as any;
+    const meta = session.metadata || {};
+    if (meta.order_id) {
+      const { error } = await supabase.from("orders").insert({
+        id: meta.order_id,
+        name: meta.name || "",
+        phone: meta.phone || "",
+        date: new Date().toISOString(),
+        items: parseItems(meta.items),
+        total: (session.amount_total || 0) / 100,
+        notes: meta.notes || "",
+        status: "Payment failed",
+        stripe_session_id: session.id,
+      });
+      if (error) console.error("Failed to record expired checkout session:", error);
     }
   }
 
