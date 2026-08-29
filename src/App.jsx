@@ -1,12 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMoocha } from './store.jsx';
 import CustomerApp from './components/CustomerApp.jsx';
 import AdminApp from './components/AdminApp.jsx';
 import Toast from './components/Toast.jsx';
+import Overlay from './components/Overlay.jsx';
+import PaymentResultModal from './components/PaymentResultModal.jsx';
 import { fireConfetti } from './components/Confetti.jsx';
 
 export default function App() {
-  const { isAdmin, enterAdmin, exitAdmin, clearCart, refreshMyLoyalty, setTab, showToast } = useMoocha();
+  const { isAdmin, enterAdmin, exitAdmin, clearCart, refreshMyLoyalty, setTab } = useMoocha();
+  const [paymentResult, setPaymentResult] = useState(null);
 
   // Handles the redirect back from Stripe after checkout succeeds/cancels.
   // The order itself is written by the stripe-webhook function once Stripe
@@ -18,10 +21,11 @@ export default function App() {
       window.history.replaceState({}, '', window.location.pathname);
       refreshMyLoyalty().then(() => setTab('loyalty'));
       fireConfetti();
-      showToast('Payment received — see you soon! 🎉');
+      setPaymentResult({ type: 'success', orderId: params.get('order_id') });
     } else if (params.get('stripe_canceled')) {
       window.history.replaceState({}, '', window.location.pathname);
-      showToast('Checkout canceled');
+      setTab('cart');
+      setPaymentResult({ type: 'canceled' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -29,6 +33,13 @@ export default function App() {
   return (
     <>
       {isAdmin ? <AdminApp onExit={exitAdmin} /> : <CustomerApp onOpenAdmin={enterAdmin} />}
+      <Overlay show={!!paymentResult} onClose={() => setPaymentResult(null)} center cardModal>
+        <PaymentResultModal
+          result={paymentResult}
+          onClose={() => setPaymentResult(null)}
+          onRetry={() => setPaymentResult(null)}
+        />
+      </Overlay>
       <Toast />
     </>
   );
