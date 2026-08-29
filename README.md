@@ -60,10 +60,38 @@ connected — change it from Settings once you're live.
 
 ## 4. Optional: card payments via Stripe
 
-Same as before — set up the `create-checkout-session` Supabase Edge
-Function and a `stripe-webhook` function that writes the order once
-Stripe confirms payment. Nothing in the React app needs to change for
-this; `startStripeCheckout` already calls `sb.functions.invoke(...)`.
+Two Supabase Edge Functions handle this — `create-checkout-session`
+(creates the Stripe Checkout session when a customer taps "Pay with
+PayNow") and `stripe-webhook` (the only place an order actually gets
+written, once Stripe confirms payment). Nothing in the React app needs to
+change for this; `CheckoutSheet` already calls `sb.functions.invoke(...)`.
+
+1. Install the [Supabase CLI](https://supabase.com/docs/guides/cli) and
+   link it to your project:
+   ```bash
+   supabase login
+   supabase link --project-ref your-project-ref
+   ```
+2. Set the required secrets:
+   ```bash
+   supabase secrets set STRIPE_SECRET_KEY=sk_test_xxx
+   supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_xxx
+   supabase secrets set SUPABASE_SERVICE_ROLE_KEY=eyJ...
+   ```
+   The service role key (not the anon key) is under Project Settings >
+   API — it must only ever live here, never in the React app.
+3. Deploy both functions:
+   ```bash
+   supabase functions deploy create-checkout-session
+   supabase functions deploy stripe-webhook
+   ```
+4. In the Stripe Dashboard, add a webhook endpoint pointing to
+   `https://your-project-ref.supabase.co/functions/v1/stripe-webhook`,
+   listening for `checkout.session.completed` and
+   `checkout.session.expired`.
+5. Redeploy `supabase functions deploy create-checkout-session` any time
+   you change that function's code — pushing to `main`/opening a PR does
+   not deploy it automatically.
 
 ## 5. Build & deploy
 
