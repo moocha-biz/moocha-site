@@ -60,6 +60,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // `customer_email` only sets the email on the Customer record created
+    // *after* payment — it doesn't prefill the visible email field on the
+    // hosted Checkout page, so customers were being asked to type it again.
+    // An actual Customer with an email already set does prefill (and lock)
+    // that field, per Stripe's docs.
+    let customerId: string | undefined;
+    if (trimmedEmail) {
+      const customer = await stripe.customers.create(
+        { email: trimmedEmail, name: String(name || "").slice(0, 250) },
+        { idempotencyKey: `customer-${orderId}` }
+      );
+      customerId = customer.id;
+    }
+
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
@@ -74,9 +88,7 @@ Deno.serve(async (req) => {
           // typical small cart, but a very large order could get truncated.
           items: JSON.stringify(items || []).slice(0, 480),
         },
-        // Prefills the email Checkout would otherwise ask for anyway, and
-        // routes Stripe's auto-generated receipt to it.
-        ...(trimmedEmail ? { customer_email: trimmedEmail } : {}),
+        ...(customerId ? { customer: customerId } : {}),
         ...(trimmedEmail ? { payment_intent_data: { receipt_email: trimmedEmail } } : {}),
         success_url: successUrl,
         cancel_url: cancelUrl,
