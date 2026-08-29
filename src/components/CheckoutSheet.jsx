@@ -6,18 +6,22 @@ export default function CheckoutSheet({ onClose }) {
   const { sb, myProfile, saveProfile, cart, cartSubtotal, showToast, settings } = useMoocha();
   const [name, setName] = useState(myProfile?.name || '');
   const [phone, setPhone] = useState(myProfile?.phone || '');
+  const [email, setEmail] = useState(myProfile?.email || '');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
+  // Generated once per sheet open (not per click) so a double-tap of "Pay
+  // with PayNow" reuses the same orderId — that's what lets the edge
+  // function's idempotency key actually catch the double-submit.
+  const [orderId] = useState(() => 'M' + Date.now().toString().slice(-6));
 
   const startPayNowCheckout = async () => {
     if (!name.trim() || !phone.trim()) { showToast('Fill in your name and phone number 🙏'); return; }
     if (!sb) { showToast("PayNow isn't set up yet — see README.md"); return; }
     setBusy(true);
-    const profile = { name: name.trim(), phone: phone.trim() };
+    const profile = { name: name.trim(), phone: phone.trim(), email: email.trim() };
     saveProfile(profile);
 
     const amount = cartSubtotal;
-    const orderId = 'M' + Date.now().toString().slice(-6);
     const items = cart.map(l => ({ name: l.name, qty: l.qty, lineTotal: l.lineTotal }));
     const base = window.location.origin + window.location.pathname;
 
@@ -25,7 +29,7 @@ export default function CheckoutSheet({ onClose }) {
     try {
       const { data, error } = await sb.functions.invoke('create-checkout-session', {
         body: {
-          orderId, name: profile.name, phone: profile.phone, notes: notes.trim(), items, amount,
+          orderId, name: profile.name, phone: profile.phone, email: profile.email, notes: notes.trim(), items, amount,
           stallName: settings.stallName,
           successUrl: `${base}?stripe_success=1&order_id=${orderId}`,
           cancelUrl: `${base}?stripe_canceled=1`,
@@ -48,6 +52,7 @@ export default function CheckoutSheet({ onClose }) {
       {!sb && <div className="demo-banner" style={{ marginBottom: 14 }}>Connect Supabase and Stripe first (see README.md) for PayNow payment to work.</div>}
       <div className="field"><label>Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>
       <div className="field"><label>Phone number</label><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="9XXX XXXX" inputMode="tel" /></div>
+      <div className="field"><label>Email (optional, for receipt)</label><input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" type="email" /></div>
       <div className="field"><label>Notes (optional)</label><textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. allergies, pickup time" /></div>
       <div className="summary-row total" style={{ marginBottom: 14 }}><span>Total</span><span>{money(cartSubtotal)}</span></div>
       <button className="btn-primary" disabled={busy || !sb} onClick={startPayNowCheckout}><span>Pay with PayNow</span><span>{money(cartSubtotal)}</span></button>

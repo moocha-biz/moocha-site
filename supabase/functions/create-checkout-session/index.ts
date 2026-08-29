@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { orderId, name, phone, notes, items, amount, stallName, successUrl, cancelUrl } = body;
+    const { orderId, name, phone, email, notes, items, amount, stallName, successUrl, cancelUrl } = body;
 
     if (!orderId || !amount || !successUrl || !cancelUrl) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -34,34 +34,47 @@ Deno.serve(async (req) => {
     // deno-lint-ignore no-explicit-any
     const itemsSummary = (items || []).map((i: any) => `${i.name} x${i.qty}`).join(", ");
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["paynow"],
-      line_items: [
-        {
-          price_data: {
-            currency: "sgd",
-            product_data: {
-              name: `${stallName || "Moocha"} order`,
-              description: itemsSummary.slice(0, 500) || undefined,
+    const trimmedEmail = String(email || "").trim();
+
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: "payment",
+        payment_method_types: ["paynow"],
+        line_items: [
+          {
+            price_data: {
+              currency: "sgd",
+              product_data: {
+                name: `${stallName || "Moocha"} order`,
+                description: itemsSummary.slice(0, 500) || undefined,
+              },
+              unit_amount: Math.round(Number(amount) * 100),
             },
-            unit_amount: Math.round(Number(amount) * 100),
+            quantity: 1,
           },
-          quantity: 1,
+        ],
+        metadata: {
+          order_id: String(orderId),
+          name: String(name || ""),
+          phone: String(phone || ""),
+          notes: String(notes || "").slice(0, 400),
+          // Stripe metadata values are capped at 500 chars each — fine for a
+          // typical small cart, but a very large order could get truncated.
+          items: JSON.stringify(items || []).slice(0, 480),
         },
-      ],
-      metadata: {
-        order_id: String(orderId),
-        name: String(name || ""),
-        phone: String(phone || ""),
-        notes: String(notes || "").slice(0, 400),
-        // Stripe metadata values are capped at 500 chars each — fine for a
-        // typical small cart, but a very large order could get truncated.
-        items: JSON.stringify(items || []).slice(0, 480),
+        // Prefills the email Checkout would otherwise ask for anyway, and
+        // routes Stripe's auto-generated receipt to it.
+        ...(trimmedEmail ? { customer_email: trimmedEmail } : {}),
+        ...(trimmedEmail ? { payment_intent_data: { receipt_email: trimmedEmail } } : {}),
+        success_url: successUrl,
+        cancel_url: cancelUrl,
       },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-    });
+      // Reuses the same Checkout Session (and skips creating a duplicate
+      // order downstream) if the client sends this request twice for the
+      // same orderId — e.g. a double-tap on "Pay with PayNow" before the
+      // button disables, or a network retry.
+      { idempotencyKey: `checkout-session-${orderId}` }
+    );
 
     return new Response(JSON.stringify({ url: session.url }), {
       status: 200,
