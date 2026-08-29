@@ -2,7 +2,7 @@ import React from 'react';
 import { useMoocha } from '../store.jsx';
 import { money } from '../lib/storage.js';
 
-export default function CartView({ onCheckout, compact = false }) {
+export default function CartView({ onCheckout, onEditLine, compact = false }) {
   const { cart, cartQty, removeLine, cartSubtotal, settings } = useMoocha();
 
   if (cart.length === 0) {
@@ -30,7 +30,10 @@ export default function CartView({ onCheckout, compact = false }) {
                 <span>{l.qty}</span>
                 <button className="mini-btn" onClick={() => cartQty(l.lineId, 1)}>+</button>
               </div>
-              <span className="remove-link" onClick={() => removeLine(l.lineId)}>Remove</span>
+              <div style={{ display: 'flex', gap: 14 }}>
+                {onEditLine && <span className="edit-link" onClick={() => onEditLine(l)}>Edit</span>}
+                <span className="remove-link" onClick={() => removeLine(l.lineId)}>Remove</span>
+              </div>
             </div>
           </div>
         );

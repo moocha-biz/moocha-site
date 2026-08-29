@@ -31,28 +31,54 @@ Deno.serve(async (req) => {
       });
     }
 
-    // deno-lint-ignore no-explicit-any
-    const itemsSummary = (items || []).map((i: any) => `${i.name} x${i.qty}`).join(", ");
-
     const trimmedEmail = String(email || "").trim();
+
+    // One Stripe line item per cart item, so the item names/quantities show
+    // up on Stripe's auto-generated receipt email — a single bundled
+    // "<stall> order" line only ever showed a generic name there, since
+    // Stripe's receipt doesn't render the line item's `description` field.
+    // deno-lint-ignore no-explicit-any
+    const lineItems = (items || [])
+      .filter((i: any) => i && i.name && Number(i.qty) > 0)
+      .map((i: any) => ({
+        price_data: {
+          currency: "sgd",
+          product_data: { name: String(i.name).slice(0, 250) },
+          unit_amount: Math.round((Number(i.lineTotal) / Number(i.qty)) * 100),
+        },
+        quantity: Number(i.qty),
+      }));
+
+    if (lineItems.length === 0) {
+      lineItems.push({
+        price_data: {
+          currency: "sgd",
+          product_data: { name: `${stallName || "Moocha"} order` },
+          unit_amount: Math.round(Number(amount) * 100),
+        },
+        quantity: 1,
+      });
+    }
+
+    // `customer_email` only sets the email on the Customer record created
+    // *after* payment — it doesn't prefill the visible email field on the
+    // hosted Checkout page, so customers were being asked to type it again.
+    // An actual Customer with an email already set does prefill (and lock)
+    // that field, per Stripe's docs.
+    let customerId: string | undefined;
+    if (trimmedEmail) {
+      const customer = await stripe.customers.create(
+        { email: trimmedEmail, name: String(name || "").slice(0, 250) },
+        { idempotencyKey: `customer-${orderId}` }
+      );
+      customerId = customer.id;
+    }
 
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
         payment_method_types: ["paynow"],
-        line_items: [
-          {
-            price_data: {
-              currency: "sgd",
-              product_data: {
-                name: `${stallName || "Moocha"} order`,
-                description: itemsSummary.slice(0, 500) || undefined,
-              },
-              unit_amount: Math.round(Number(amount) * 100),
-            },
-            quantity: 1,
-          },
-        ],
+        line_items: lineItems,
         metadata: {
           order_id: String(orderId),
           name: String(name || ""),
@@ -62,9 +88,7 @@ Deno.serve(async (req) => {
           // typical small cart, but a very large order could get truncated.
           items: JSON.stringify(items || []).slice(0, 480),
         },
-        // Prefills the email Checkout would otherwise ask for anyway, and
-        // routes Stripe's auto-generated receipt to it.
-        ...(trimmedEmail ? { customer_email: trimmedEmail } : {}),
+        ...(customerId ? { customer: customerId } : {}),
         ...(trimmedEmail ? { payment_intent_data: { receipt_email: trimmedEmail } } : {}),
         success_url: successUrl,
         cancel_url: cancelUrl,

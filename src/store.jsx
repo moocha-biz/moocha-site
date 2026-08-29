@@ -304,6 +304,14 @@ export function MoochaProvider({ children }) {
     });
   }, [saveCartLocal]);
 
+  const updateLine = useCallback((lineId, patch) => {
+    setCart(prev => {
+      const next = prev.map(l => (l.lineId === lineId ? { ...l, ...patch, lineId } : l));
+      saveCartLocal(next);
+      return next;
+    });
+  }, [saveCartLocal]);
+
   const removeLine = useCallback((lineId) => {
     setCart(prev => {
       const next = prev.filter(l => l.lineId !== lineId);
@@ -361,7 +369,7 @@ export function MoochaProvider({ children }) {
     sb,
     // customer state
     tab, setTab, activeCat, setActiveCat,
-    cart, cartSubtotal, addLineToCart, cartQty, removeLine, clearCart,
+    cart, cartSubtotal, addLineToCart, cartQty, updateLine, removeLine, clearCart,
     myProfile, saveProfile, myStamps, refreshMyLoyalty,
     // shared state
     menu, setMenu, settings, setSettings, orders, setOrders, customers, setCustomers,

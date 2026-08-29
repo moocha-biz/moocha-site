@@ -108,6 +108,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .mini-qty{ display:flex; align-items:center; gap:10px;}
 .mini-btn{ width:28px;height:28px;border-radius:9px;border:none; background:var(--mint); cursor:pointer; font-weight:800; color:var(--green-dark);}
 .remove-link{ font-size:11.5px; color:var(--blush-deep); font-weight:700; cursor:pointer;}
+.edit-link{ font-size:11.5px; color:var(--green-dark); font-weight:700; cursor:pointer;}
 
 .summary-row{ display:flex; justify-content:space-between; font-size:13.5px; padding:6px 0; color:#5b6e54; font-weight:700;}
 .summary-row.total{ font-family:'Baloo 2'; font-weight:800; font-size:17px; color:var(--green-dark); border-top:2px dashed var(--line); margin-top:6px; padding-top:12px;}
