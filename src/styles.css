@@ -192,9 +192,13 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
    e-commerce layout: multi-column menu + a persistent cart sidebar.
    ============================================================ */
 
-/* Tablet: still one column, but roomier and centered */
+/* Tablet: two columns, and the card itself widens to give them room
+   (without this, iPads stayed capped at the 460px phone width and the
+   2-column grid squeezed into ~200px cards with huge empty margins) */
 @media (min-width: 768px){
-  .menu-grid{ grid-template-columns:repeat(2,1fr); }
+  .app-shell{ max-width:720px; }
+  .app{ max-width:720px; }
+  .menu-grid{ grid-template-columns:repeat(2,1fr); gap:14px; }
   .stamp-grid{ grid-template-columns:repeat(6,1fr); }
 }
 

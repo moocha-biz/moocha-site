@@ -61,6 +61,31 @@ Deno.serve(async (req) => {
       stripe_session_id: session.id,
     });
     if (error) console.error("Failed to insert order from webhook:", error);
+
+    // Bump the customer's loyalty stamp count — this is the only place
+    // that happens now that PayNow-via-Stripe is the sole checkout path
+    // (the old manual "Place order" flow used to do this client-side).
+    if (meta.phone) {
+      const { data: existing, error: selError } = await supabase
+        .from("customers")
+        .select("stamps")
+        .eq("phone", meta.phone)
+        .maybeSingle();
+      if (selError) {
+        console.error("Failed to look up customer for stamp bump:", selError);
+      } else if (existing) {
+        const { error: updError } = await supabase
+          .from("customers")
+          .update({ stamps: (existing.stamps || 0) + 1, name: meta.name || "", updated_at: new Date().toISOString() })
+          .eq("phone", meta.phone);
+        if (updError) console.error("Failed to bump customer stamp:", updError);
+      } else {
+        const { error: insError } = await supabase
+          .from("customers")
+          .insert({ phone: meta.phone, name: meta.name || "", stamps: 1 });
+        if (insError) console.error("Failed to create customer stamp record:", insError);
+      }
+    }
   }
 
   return new Response(JSON.stringify({ received: true }), {

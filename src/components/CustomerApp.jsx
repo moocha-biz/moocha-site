@@ -10,7 +10,6 @@ import Overlay from './Overlay.jsx';
 import ItemSheet from './ItemSheet.jsx';
 import CheckoutSheet from './CheckoutSheet.jsx';
 import PinModal from './PinModal.jsx';
-import { fireConfetti } from './Confetti.jsx';
 
 export default function CustomerApp({ onOpenAdmin }) {
   const { tab, setTab, menu } = useMoocha();
@@ -63,7 +62,7 @@ export default function CustomerApp({ onOpenAdmin }) {
       </Overlay>
 
       <Overlay show={checkoutOpen} onClose={() => setCheckoutOpen(false)}>
-        <CheckoutSheet onClose={() => setCheckoutOpen(false)} onPlaced={fireConfetti} />
+        <CheckoutSheet onClose={() => setCheckoutOpen(false)} />
       </Overlay>
 
       <Overlay show={pinOpen} onClose={() => setPinOpen(false)} center cardModal>

@@ -1,9 +1,9 @@
 // supabase/functions/create-checkout-session/index.ts
 //
 // Called by the customer app when someone taps "Checkout". Creates a
-// Stripe Checkout Session that offers both card and PayNow (Stripe
-// generates and verifies the PayNow QR itself), then hands back the
-// URL to redirect the customer to.
+// Stripe Checkout Session for PayNow only (Stripe generates and
+// verifies the PayNow QR itself), then hands back the URL to redirect
+// the customer to.
 //
 // Needs these secrets set once via:
 //   supabase secrets set STRIPE_SECRET_KEY=sk_test_xxx
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["card", "paynow"],
+      payment_method_types: ["paynow"],
       line_items: [
         {
           price_data: {

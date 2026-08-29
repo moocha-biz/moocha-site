@@ -5,41 +5,24 @@ import Overlay from '../Overlay.jsx';
 import ItemEditorSheet from './ItemEditorSheet.jsx';
 
 export default function MenuEditorTab() {
-  const { menu, setMenu, persistMenu } = useMoocha();
+  const { menu, menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuDeleteItem, menuMoveItem } = useMoocha();
   const [editing, setEditing] = useState(null); // { cat, item }
-
-  const withMenu = async (mutate) => {
-    const next = { categories: { ...menu.categories } };
-    for (const c in next.categories) next.categories[c] = [...next.categories[c]];
-    mutate(next);
-    setMenu(next);
-    await persistMenu(next);
-  };
 
   const addCategory = () => {
     const name = window.prompt('New category name:');
     if (!name) return;
-    withMenu(next => { if (!next.categories[name]) next.categories[name] = []; });
+    menuAddCategory(name);
   };
   const deleteCategory = (cat) => {
     if (!window.confirm(`Delete "${cat}" and all its items?`)) return;
-    withMenu(next => { delete next.categories[cat]; });
+    menuDeleteCategory(cat);
   };
-  const toggleSoldout = (cat, id) => withMenu(next => {
-    const it = next.categories[cat].find(i => i.id === id);
-    if (it) it.soldout = !it.soldout;
-  });
+  const toggleSoldout = (cat, id) => menuToggleSoldout(cat, id);
   const deleteItem = (cat, id) => {
     if (!window.confirm('Delete this item?')) return;
-    withMenu(next => { next.categories[cat] = next.categories[cat].filter(i => i.id !== id); });
+    menuDeleteItem(cat, id);
   };
-  const moveItem = (cat, id, dir) => withMenu(next => {
-    const items = next.categories[cat];
-    const i = items.findIndex(x => x.id === id);
-    const j = i + dir;
-    if (j < 0 || j >= items.length) return;
-    [items[i], items[j]] = [items[j], items[i]];
-  });
+  const moveItem = (cat, id, dir) => menuMoveItem(cat, id, dir);
 
   return (
     <>
