@@ -202,7 +202,7 @@ begin
 
   delete from item_sugar_levels where item_id = p_id;
   insert into item_sugar_levels (item_id, level, sort_order)
-    select p_id, sg.value #>> '{}', ord - 1
+    select p_id, sg #>> '{}', ord - 1
     from jsonb_array_elements(p_sugar_levels) with ordinality as t(sg, ord);
 end;
 $$;

@@ -65,11 +65,11 @@ export default function CustomerApp({ onOpenAdmin }) {
         </div>
       </aside>
 
-      <Overlay show={!!openItem} onClose={() => setOpenItemId(null)}>
+      <Overlay show={!!openItem} onClose={() => setOpenItemId(null)} floatClose>
         {openItem && <ItemSheet item={openItem} onClose={() => setOpenItemId(null)} />}
       </Overlay>
 
-      <Overlay show={!!editItem} onClose={() => setEditLine(null)}>
+      <Overlay show={!!editItem} onClose={() => setEditLine(null)} floatClose>
         {editItem && <ItemSheet item={editItem} editLine={editLine} onClose={() => setEditLine(null)} />}
       </Overlay>
 

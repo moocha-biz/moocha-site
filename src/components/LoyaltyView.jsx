@@ -19,7 +19,7 @@ export default function LoyaltyView() {
         <div className="order-row" key={o.id}>
           <div className="order-row-left">
             <div className="oid">#{o.id}</div>
-            <div className="oitems">{o.items.map(i => `${i.name} x${i.qty}`).join(', ')}</div>
+            <div className="oitems">{o.items.map(i => `${i.name}${i.sugar ? ` (${i.sugar})` : ''} x${i.qty}`).join(', ')}</div>
             <span className="order-status">{o.status}</span>
           </div>
           <div className="order-row-right"><div className="oprice">{money(o.total)}</div></div>

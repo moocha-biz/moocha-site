@@ -22,7 +22,7 @@ export default function CheckoutSheet({ onClose }) {
     saveProfile(profile);
 
     const amount = cartSubtotal;
-    const items = cart.map(l => ({ name: l.name, qty: l.qty, lineTotal: l.lineTotal }));
+    const items = cart.map(l => ({ itemId: l.itemId, name: l.name, sugar: l.sugar, qty: l.qty, lineTotal: l.lineTotal }));
     const base = window.location.origin + window.location.pathname;
 
     showToast('Taking you to PayNow…');
@@ -35,7 +35,12 @@ export default function CheckoutSheet({ onClose }) {
           cancelUrl: `${base}?stripe_canceled=1`,
         },
       });
-      if (error || !data?.url) { console.error(error); showToast("PayNow isn't set up yet — try again later"); setBusy(false); return; }
+      if (error || !data?.url) {
+        console.error(error);
+        showToast(data?.error || "PayNow isn't set up yet — try again later");
+        setBusy(false);
+        return;
+      }
       window.location.href = data.url;
     } catch (err) {
       console.error(err);

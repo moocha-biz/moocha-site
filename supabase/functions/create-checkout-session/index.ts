@@ -11,9 +11,14 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import Stripe from "https://esm.sh/stripe@14?target=deno";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!);
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -29,6 +34,37 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Payment happens after this session is created, so this is the only
+    // point we can actually stop an oversell — the webhook that books
+    // stock only runs once Stripe confirms the money already moved.
+    // deno-lint-ignore no-explicit-any
+    const itemIds = (items || []).map((i: any) => i.itemId).filter(Boolean);
+    if (itemIds.length > 0) {
+      const { data: stockRows, error: stockError } = await supabase
+        .from("items")
+        .select("id, name, preorder_limit, preorder_sold")
+        .in("id", itemIds);
+      if (stockError) {
+        console.error("Stock check failed:", stockError);
+      } else {
+        // deno-lint-ignore no-explicit-any
+        for (const line of items as any[]) {
+          const row = stockRows?.find((r) => r.id === line.itemId);
+          if (!row || row.preorder_limit == null) continue;
+          const remaining = row.preorder_limit - row.preorder_sold;
+          if (Number(line.qty) > remaining) {
+            // 200 (not an HTTP error status) so the client SDK hands this
+            // straight back as `data` instead of wrapping it in a
+            // FunctionsHttpError that needs unwrapping to read the message.
+            return new Response(
+              JSON.stringify({ error: `Sorry, only ${Math.max(remaining, 0)} of "${row.name}" left for preorder.` }),
+              { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+      }
     }
 
     const trimmedEmail = String(email || "").trim();

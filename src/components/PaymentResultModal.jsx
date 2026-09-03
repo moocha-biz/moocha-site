@@ -58,14 +58,14 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
       )}
       {order && (
         <>
-          <span className="order-status" style={{ display: 'block', width: 'fit-content', margin: '0 auto 14px' }}>{order.status}</span>
+          <div className="sheet-sub" style={{ textAlign: 'center' }}>Your loyalty stamp will be given when you collect this order.</div>
           {(order.items || []).map((it, i) => (
-            <div className="summary-row" key={i}><span>{it.name} x{it.qty}</span><span>{money(it.lineTotal)}</span></div>
+            <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}</span><span>{money(it.lineTotal)}</span></div>
           ))}
           <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
         </>
       )}
-      <button className="btn-primary" onClick={onClose}><span>See you soon!</span><span>🧋</span></button>
+      <button className="btn-primary" onClick={onClose}><span>See you soon!</span></button>
     </>
   );
 }
