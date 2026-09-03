@@ -1,4 +1,4 @@
-export const STAMP_GOAL = 12;
+export const STAMP_GOAL = 8;
 
 export const DEFAULT_SETTINGS = {
   paymentEnabled: true,
