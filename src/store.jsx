@@ -88,7 +88,7 @@ export function MoochaProvider({ children }) {
     if (!sb) return getLocal('demo_orders', []);
     const { data, error } = await sb.from('orders').select('*').order('date', { ascending: false });
     if (error) { noteSupabaseError('Loading orders', error); return []; }
-    return data.map(r => ({ id: r.id, name: r.name, phone: r.phone, date: r.date, items: r.items, total: Number(r.total), notes: r.notes, status: r.status, orderType: r.order_type, collectedAt: r.collected_at, stripeSessionId: r.stripe_session_id }));
+    return data.map(r => ({ id: r.id, name: r.name, phone: r.phone, date: r.date, items: r.items, total: Number(r.total), notes: r.notes, status: r.status, orderType: r.order_type, collectedAt: r.collected_at, stripeSessionId: r.stripe_session_id, refundedAt: r.refunded_at, refundId: r.refund_id }));
   }, [noteSupabaseError]);
 
   const fetchSettings = useCallback(async () => {
@@ -284,6 +284,39 @@ export function MoochaProvider({ children }) {
     if (error) noteSupabaseError('Deleting order', error);
     setOrders(await fetchOrders());
   }, [fetchOrders, noteSupabaseError]);
+
+  // Stripe-paid orders go through the refund-order edge function (it's the
+  // only place that can actually call stripe.refunds.create, since only it
+  // holds the Stripe secret key); cash/walk-in orders have no Stripe
+  // payment to reverse, so they call refund_order() directly instead.
+  const refundOrder = useCallback(async (order) => {
+    if (!sb) {
+      const list = getLocal('demo_orders', []);
+      const o = list.find(x => x.id === order.id);
+      if (o && (o.status === 'Received' || o.status === 'Collected')) {
+        o.status = 'Refunded';
+        o.refundedAt = new Date().toISOString();
+        setLocal('demo_orders', list);
+        setOrders([...list]);
+      }
+      return { error: null };
+    }
+    if (order.stripeSessionId) {
+      const { data, error } = await sb.functions.invoke('refund-order', { body: { orderId: order.id } });
+      if (error || data?.error) {
+        const message = data?.error || error?.message || 'Refund failed';
+        noteSupabaseError('Refunding order', { message });
+        return { error: message };
+      }
+    } else {
+      const { error } = await sb.rpc('refund_order', { p_id: order.id });
+      if (error) { noteSupabaseError('Refunding order', error); return { error: error.message }; }
+    }
+    setOrders(await fetchOrders());
+    setCustomers(await fetchCustomers());
+    setMenu(await fetchMenuData());
+    return { error: null };
+  }, [fetchOrders, fetchCustomers, fetchMenuData, noteSupabaseError]);
 
   const setCustomerStamps = useCallback(async (phone, stamps) => {
     if (!sb) {
@@ -492,7 +525,7 @@ export function MoochaProvider({ children }) {
     // backend actions
     fetchOrders, fetchSettings, fetchMenuData, fetchCustomers,
     menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuSaveItem,
-    persistSettings, setCollectionHours, deleteOrder, logWalkinOrder, markOrderCollected,
+    persistSettings, setCollectionHours, deleteOrder, refundOrder, logWalkinOrder, markOrderCollected,
     setCustomerStamps, deleteCustomerRecord,
     noteSupabaseError,
   };

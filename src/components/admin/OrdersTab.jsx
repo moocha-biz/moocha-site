@@ -7,7 +7,7 @@ import WalkinOrderSheet from './WalkinOrderSheet.jsx';
 import OrderDetailSheet from './OrderDetailSheet.jsx';
 
 const TYPE_FILTERS = [{ key: 'all', label: 'All types' }, { key: 'preorder', label: 'Preorder' }, { key: 'walkin', label: 'Walk-in' }];
-const STATUS_FILTERS = [{ key: 'all', label: 'All statuses' }, { key: 'Received', label: 'Received' }, { key: 'Collected', label: 'Collected' }, { key: 'Payment failed', label: 'Payment failed' }];
+const STATUS_FILTERS = [{ key: 'all', label: 'All statuses' }, { key: 'Received', label: 'Received' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }, { key: 'Payment failed', label: 'Payment failed' }];
 
 // <input type="date"> gives/wants "YYYY-MM-DD" in local time.
 function toLocalDateStr(iso) {

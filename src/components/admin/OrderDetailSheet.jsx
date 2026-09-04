@@ -16,6 +16,13 @@ function OrderProgress({ status }) {
       </div>
     );
   }
+  if (status === 'Refunded') {
+    return (
+      <div style={{ background: 'var(--blush)', color: '#8a3a2a', borderRadius: 14, padding: '12px 16px', marginBottom: 18, fontWeight: 800, fontFamily: "'Baloo 2'", textAlign: 'center', fontSize: 13 }}>
+        ↩️ Refunded
+      </div>
+    );
+  }
   const collected = status === 'Collected';
   const steps = [{ label: 'Order placed', done: true }, { label: 'Collected', done: collected }];
   return (
@@ -40,7 +47,9 @@ function OrderProgress({ status }) {
 }
 
 export default function OrderDetailSheet({ order, onClose }) {
-  const { markOrderCollected, deleteOrder, showToast } = useMoocha();
+  const { markOrderCollected, deleteOrder, refundOrder, showToast } = useMoocha();
+  const [refunding, setRefunding] = React.useState(false);
+  const canRefund = order.status === 'Received' || order.status === 'Collected';
 
   const collect = async () => {
     await markOrderCollected(order.id);
@@ -52,6 +61,17 @@ export default function OrderDetailSheet({ order, onClose }) {
     if (!window.confirm(`Delete order #${order.id}? This can't be undone.`)) return;
     await deleteOrder(order.id);
     showToast('Order deleted ✓');
+    onClose();
+  };
+
+  const refund = async () => {
+    const verb = order.stripeSessionId ? `refund ${money(order.total)} via Stripe for` : 'mark refunded (cash)';
+    if (!window.confirm(`Really ${verb} order #${order.id}? This can't be undone.`)) return;
+    setRefunding(true);
+    const { error } = await refundOrder(order);
+    setRefunding(false);
+    if (error) { showToast(error); return; }
+    showToast('Order refunded ✓');
     onClose();
   };
 
@@ -82,6 +102,16 @@ export default function OrderDetailSheet({ order, onClose }) {
         </div>
       </div>
 
+      {order.status === 'Refunded' && (
+        <div className="field">
+          <label>Refunded at</label>
+          <div className="admin-item-name" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>
+            {order.refundedAt ? new Date(order.refundedAt).toLocaleString() : '—'}
+            {order.refundId ? ` · ${order.refundId}` : ''}
+          </div>
+        </div>
+      )}
+
       {order.notes && (
         <div className="field"><label>Notes</label><div className="admin-item-name" style={{ fontWeight: 600 }}>{order.notes}</div></div>
       )}
@@ -96,7 +126,12 @@ export default function OrderDetailSheet({ order, onClose }) {
       <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
 
       {order.status === 'Received' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
-      <button className="btn-secondary" style={{ marginTop: order.status === 'Received' ? 8 : 16, color: '#b5563f', borderColor: '#FFDCD2' }} onClick={remove}>Delete order</button>
+      {canRefund && (
+        <button className="btn-secondary" style={{ marginTop: 8, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>
+          {refunding ? 'Refunding…' : order.stripeSessionId ? 'Refund via Stripe' : 'Mark refunded (cash)'}
+        </button>
+      )}
+      <button className="btn-secondary" style={{ marginTop: canRefund ? 8 : 16, color: '#b5563f', borderColor: '#FFDCD2' }} onClick={remove}>Delete order</button>
     </>
   );
 }
