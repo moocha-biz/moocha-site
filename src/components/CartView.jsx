@@ -3,7 +3,7 @@ import { useMoocha } from '../store.jsx';
 import { money } from '../lib/storage.js';
 
 export default function CartView({ onCheckout, onEditLine, compact = false }) {
-  const { cart, cartQty, removeLine, cartSubtotal, settings } = useMoocha();
+  const { cart, cartQty, removeLine, cartSubtotal, ordersOpen } = useMoocha();
 
   if (cart.length === 0) {
     return (
@@ -14,12 +14,12 @@ export default function CartView({ onCheckout, onEditLine, compact = false }) {
     );
   }
 
-  const disabled = !settings.paymentEnabled;
+  const disabled = !ordersOpen;
 
   return (
     <>
       {cart.map(l => {
-        const opts = [l.ice, l.sugar, l.milk, l.size, ...l.addons].filter(Boolean).join(' · ');
+        const opts = l.sugar || '';
         return (
           <div className="cart-line" key={l.lineId}>
             <div className="cart-line-top"><span>{l.name}</span><span>{money(l.lineTotal)}</span></div>

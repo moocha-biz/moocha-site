@@ -40,10 +40,10 @@ export default function SalesTab() {
       </div>
       <div className="chart-card"><canvas ref={canvasRef} height="160" /></div>
       <div className="chart-card">
-        <div style={{ fontFamily: "'Baloo 2'", fontWeight: 700, marginBottom: 8 }}>Top items</div>
+        <div className="card-heading">Top items</div>
         {topItems.length
           ? topItems.map(([name, qty]) => <div className="top-item-row" key={name}><span>{name}</span><span>{qty} sold</span></div>)
-          : <div style={{ fontSize: 13, color: 'var(--brand)' }}>No orders yet.</div>}
+          : <div className="section-note">No orders yet.</div>}
       </div>
     </>
   );

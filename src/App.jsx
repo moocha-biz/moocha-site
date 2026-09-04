@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import { useMoocha } from './store.jsx';
 import CustomerApp from './components/CustomerApp.jsx';
-import AdminApp from './components/AdminApp.jsx';
+import AdminRoute from './components/AdminRoute.jsx';
+import NotFound from './components/NotFound.jsx';
 import Toast from './components/Toast.jsx';
 import Overlay from './components/Overlay.jsx';
 import PaymentResultModal from './components/PaymentResultModal.jsx';
 import { fireConfetti } from './components/Confetti.jsx';
 
 export default function App() {
-  const { isAdmin, enterAdmin, exitAdmin, clearCart, refreshMyLoyalty, setTab } = useMoocha();
+  const { clearCart, refreshMyLoyalty, setTab } = useMoocha();
   const [paymentResult, setPaymentResult] = useState(null);
 
   // Handles the redirect back from Stripe after checkout succeeds/cancels.
@@ -32,7 +34,14 @@ export default function App() {
 
   return (
     <>
-      {isAdmin ? <AdminApp onExit={exitAdmin} /> : <CustomerApp onOpenAdmin={enterAdmin} />}
+      <Routes>
+        <Route path="/admin" element={<AdminRoute />} />
+        <Route path="/" element={<CustomerApp />} />
+        <Route path="/menu" element={<CustomerApp />} />
+        <Route path="/cart" element={<CustomerApp />} />
+        <Route path="/rewards" element={<CustomerApp />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
       <Overlay show={!!paymentResult} onClose={() => setPaymentResult(null)} center cardModal>
         <PaymentResultModal
           result={paymentResult}

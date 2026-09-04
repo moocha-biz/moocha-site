@@ -1,5 +1,46 @@
 import React, { useState } from 'react';
 import { useMoocha, DEFAULT_SUGAR_LEVELS } from '../../store.jsx';
+import ItemTags from '../ItemTags.jsx';
+
+const TAG_COLOR_PRESETS = ['#4C8558', '#F2B705', '#FF9E8B', '#85A573', '#2F5233', '#FED7FE'];
+
+function TagsEditor({ tags, setTags }) {
+  const update = (i, field, value) => {
+    const next = [...tags];
+    next[i] = { ...next[i], [field]: value };
+    setTags(next);
+  };
+  const remove = (i) => setTags(tags.filter((_, idx) => idx !== i));
+  const add = () => setTags([...tags, { text: '', color: TAG_COLOR_PRESETS[tags.length % TAG_COLOR_PRESETS.length] }]);
+
+  return (
+    <div className="field">
+      <label>Custom tags (e.g. "New!", "Bestseller")</label>
+      {tags.length === 0 && <div className="section-note" style={{ marginBottom: 8 }}>None yet — add one to badge this item on the menu.</div>}
+      {tags.map((tag, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+          <input
+            type="color" value={tag.color || '#4C8558'} onChange={e => update(i, 'color', e.target.value)}
+            style={{ width: 40, height: 38, border: '2px solid var(--line)', borderRadius: 12, padding: 2, background: 'var(--paper)', flexShrink: 0, cursor: 'pointer' }}
+          />
+          <input
+            value={tag.text || ''} placeholder="Tag text" maxLength={24}
+            style={{ flex: 1, border: '2px solid var(--line)', background: 'var(--paper)', borderRadius: 12, padding: '9px 12px', fontWeight: 700, fontSize: 13.5, color: 'var(--green-dark)' }}
+            onChange={e => update(i, 'text', e.target.value)}
+          />
+          <button className="icon-btn danger" title="Remove" onClick={() => remove(i)}>✕</button>
+        </div>
+      ))}
+      {tags.some(t => t.text) && (
+        <div style={{ marginBottom: 8 }}>
+          <div className="section-note" style={{ marginBottom: 4 }}>Preview</div>
+          <ItemTags tags={tags} />
+        </div>
+      )}
+      <button className="btn-secondary" onClick={add}>+ Add tag</button>
+    </div>
+  );
+}
 
 function RowsEditor({ label, rows, setRows, withPrice, addLabel, emptyNote }) {
   const update = (i, field, value) => {
@@ -36,7 +77,7 @@ function RowsEditor({ label, rows, setRows, withPrice, addLabel, emptyNote }) {
               onChange={e => { const next = [...rows]; next[i] = e.target.value; setRows(next); }}
             />
           )}
-          <button className="icon-btn danger" onClick={() => remove(i)}>✕</button>
+          <button className="icon-btn danger" title="Remove" onClick={() => remove(i)}>✕</button>
         </div>
       ))}
       <button className="btn-secondary" onClick={add}>{addLabel}</button>
@@ -51,9 +92,10 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
   const [price, setPrice] = useState(item ? item.price : '');
   const [category, setCategory] = useState(cat);
   const [iced, setIced] = useState(item?.iced || false);
-  const [milks, setMilks] = useState(item?.milks ? item.milks.map(o => ({ ...o })) : []);
-  const [toppings, setToppings] = useState(item?.toppings ? item.toppings.map(o => ({ ...o })) : []);
   const [sugarLevels, setSugarLevels] = useState(item?.sugarLevels?.length ? [...item.sugarLevels] : [...DEFAULT_SUGAR_LEVELS]);
+  const [preorderLimit, setPreorderLimit] = useState(item?.preorderLimit ?? '');
+  const [walkinLimit, setWalkinLimit] = useState(item?.walkinLimit ?? '');
+  const [customTags, setCustomTags] = useState(item?.customTags?.length ? item.customTags.map(t => ({ ...t })) : []);
   const [photoUrl, setPhotoUrl] = useState(item?.photo || null);
   const [uploading, setUploading] = useState(false);
 
@@ -63,6 +105,12 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
     if (!file.type.startsWith('image/')) { showToast('Please choose a JPEG or PNG'); return; }
     if (file.size > 5 * 1024 * 1024) { showToast('Please choose an image under 5MB'); return; }
 
+    // Show the picked photo immediately from the local file, instead of
+    // making the admin stare at "No photo" until the network upload
+    // finishes — then swap it for the real hosted URL once that's done.
+    const localPreview = URL.createObjectURL(file);
+    setPhotoUrl(localPreview);
+
     if (sb) {
       setUploading(true);
       showToast('Uploading photo…');
@@ -70,13 +118,14 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
       const path = `item-${Date.now()}.${ext}`;
       const { error } = await sb.storage.from('menu-photos').upload(path, file, { upsert: true });
       setUploading(false);
-      if (error) { console.error(error); showToast('Upload failed — try again'); return; }
+      if (error) { console.error(error); showToast(`Upload failed — ${error.message || 'try again'}`); URL.revokeObjectURL(localPreview); setPhotoUrl(item?.photo || null); return; }
       const { data } = sb.storage.from('menu-photos').getPublicUrl(path);
+      URL.revokeObjectURL(localPreview);
       setPhotoUrl(data.publicUrl);
       showToast('Photo uploaded ✓');
     } else {
       const reader = new FileReader();
-      reader.onload = () => setPhotoUrl(reader.result);
+      reader.onload = () => { URL.revokeObjectURL(localPreview); setPhotoUrl(reader.result); };
       reader.readAsDataURL(file);
     }
   };
@@ -86,18 +135,21 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
     const trimmedCat = category.trim();
     if (!trimmedName || !trimmedCat) { showToast('Name and category are required'); return; }
 
-    const cleanMilks = milks.filter(m => (m.name || '').trim()).map(m => ({ id: m.id, name: m.name.trim(), price: m.price || 0 }));
-    const cleanToppings = toppings.filter(t => (t.name || '').trim()).map(t => ({ id: t.id, name: t.name.trim(), price: t.price || 0 }));
     const cleanSugarLevels = sugarLevels.map(s => s.trim()).filter(Boolean);
+    const cleanTags = customTags.filter(t => (t.text || '').trim()).map(t => ({ text: t.text.trim().slice(0, 24), color: t.color || '#4C8558' }));
 
     await menuSaveItem({
       id: item ? item.id : ('i' + Date.now()),
       category: trimmedCat, name: trimmedName, desc: desc.trim(), price: parseFloat(price) || 0, iced,
-      soldout: item ? item.soldout : false, photo: photoUrl,
-      milks: cleanMilks, toppings: cleanToppings, sugarLevels: cleanSugarLevels,
+      soldout: item ? item.soldout : false, isHidden: item ? item.isHidden : false, photo: photoUrl,
+      sugarLevels: cleanSugarLevels,
+      preorderLimit: preorderLimit === '' ? null : Math.max(0, parseInt(preorderLimit, 10) || 0),
+      walkinLimit: walkinLimit === '' ? null : Math.max(0, parseInt(walkinLimit, 10) || 0),
+      customTags: cleanTags,
     });
     onSaved?.();
     onClose();
+    showToast(item ? 'Item saved ✓' : 'Item added ✓');
   };
 
   return (
@@ -120,9 +172,17 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
       <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, marginBottom: 16 }}>
         <input type="checkbox" checked={iced} onChange={e => setIced(e.target.checked)} style={{ width: 18, height: 18 }} /> Served iced
       </label>
+      <div className="field">
+        <label>Preorder stock limit this week{item?.preorderSold ? ` (${item.preorderSold} sold)` : ''}</label>
+        <input type="number" min="0" value={preorderLimit} placeholder="Leave blank for unlimited" onChange={e => setPreorderLimit(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Walk-in stock limit this week{item?.walkinSold ? ` (${item.walkinSold} sold)` : ''}</label>
+        <input type="number" min="0" value={walkinLimit} placeholder="Leave blank for unlimited" onChange={e => setWalkinLimit(e.target.value)} />
+      </div>
+      <div className="section-note" style={{ marginTop: -8, marginBottom: 16 }}>Both reset to 0 sold whenever you save new collection hours in Settings.</div>
+      <TagsEditor tags={customTags} setTags={setCustomTags} />
       <RowsEditor label="Sweetness levels for this drink" rows={sugarLevels} setRows={setSugarLevels} withPrice={false} addLabel="+ Add sweetness level" emptyNote="None yet — this drink won't offer a sweetness choice until you add one." />
-      <RowsEditor label="Milk options for this drink" rows={milks} setRows={setMilks} withPrice addLabel="+ Add milk option" emptyNote="None yet — this drink won't offer a milk choice until you add one." />
-      <RowsEditor label="Toppings for this drink" rows={toppings} setRows={setToppings} withPrice addLabel="+ Add topping" emptyNote="None yet — this drink won't offer a topping until you add one." />
       <button className="btn-primary" onClick={save}><span>Save item</span><span>→</span></button>
       <button className="btn-secondary" onClick={onClose}>Cancel</button>
     </>

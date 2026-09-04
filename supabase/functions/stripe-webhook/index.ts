@@ -68,33 +68,25 @@ Deno.serve(async (req) => {
       total: (session.amount_total || 0) / 100,
       notes: meta.notes || "",
       status: "Received",
+      order_type: "preorder",
       stripe_session_id: session.id,
     });
-    if (error) console.error("Failed to insert order from webhook:", error);
 
-    // Bump the customer's loyalty stamp count — this is the only place
-    // that happens now that PayNow-via-Stripe is the sole checkout path
-    // (the old manual "Place order" flow used to do this client-side).
-    if (meta.phone) {
-      const { data: existing, error: selError } = await supabase
-        .from("customers")
-        .select("stamps")
-        .eq("phone", meta.phone)
-        .maybeSingle();
-      if (selError) {
-        console.error("Failed to look up customer for stamp bump:", selError);
-      } else if (existing) {
-        const { error: updError } = await supabase
-          .from("customers")
-          .update({ stamps: (existing.stamps || 0) + 1, name: meta.name || "", updated_at: new Date().toISOString() })
-          .eq("phone", meta.phone);
-        if (updError) console.error("Failed to bump customer stamp:", updError);
-      } else {
-        const { error: insError } = await supabase
-          .from("customers")
-          .insert({ phone: meta.phone, name: meta.name || "", stamps: 1 });
-        if (insError) console.error("Failed to create customer stamp record:", insError);
-      }
+    if (error) {
+      // Stripe explicitly can redeliver the same event more than once.
+      // orders.id is the primary key, so a redelivery lands here as a
+      // conflict (already inserted) rather than a duplicate row — and
+      // critically, we must NOT re-run the stock booking below for it,
+      // or the same paid order would get double-counted against stock.
+      console.error("Order insert skipped (likely a duplicate webhook delivery):", error);
+    } else {
+      // Books this order's items against each item's preorder stock
+      // counter. Only reached on a genuine first-time insert. The loyalty
+      // stamp is no longer given here — it's only awarded when staff mark
+      // the order collected (mark_order_collected), since a paid preorder
+      // isn't picked up yet at this point.
+      const { error: stockError } = await supabase.rpc("record_preorder_sale", { p_items: items });
+      if (stockError) console.error("Failed to record preorder stock:", stockError);
     }
   } else if (event.type === "checkout.session.expired") {
     // The PayNow QR timed out (or the customer closed the tab) before
