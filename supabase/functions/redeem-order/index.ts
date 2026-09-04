@@ -52,6 +52,10 @@ Deno.serve(async (req) => {
 
     // Never trust the client's word that this phone is eligible — re-check
     // against the database, the same way create-checkout-session does.
+    // This is just a friendly early check to skip the stock lookup below
+    // for an obviously-ineligible request; place_redeemed_order() re-checks
+    // (and actually deducts) under a row lock, so it's what really decides
+    // eligibility.
     const { data: rewardRow } = await supabase
       .from("customers")
       .select("stamps")
@@ -134,45 +138,40 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { error: insertError } = await supabase.from("orders").insert({
-      id: orderId,
-      name: String(name || ""),
-      phone: trimmedPhone,
-      date: new Date().toISOString(),
-      items: metaItems,
-      total: 0,
-      notes: String(notes || "").slice(0, 400),
-      status: "Received",
-      order_type: "preorder",
+    // Order insert, stamp deduction, and stock booking all happen inside
+    // one atomic, row-locked function — not three separate client calls —
+    // so the 8 stamps actually come off the moment the order is placed
+    // (not only once staff mark it collected), and a concurrent redemption
+    // attempt for the same phone can't both pass the eligibility check
+    // before either one deducts. orders.id being the primary key still
+    // makes a retried request for the same orderId (double-tap, network
+    // hiccup) idempotent — place_redeemed_order hands back the existing
+    // order instead of erroring or double-deducting for it.
+    const { data: placed, error: placeError } = await supabase.rpc("place_redeemed_order", {
+      p_id: orderId,
+      p_name: String(name || ""),
+      p_phone: trimmedPhone,
+      p_token: customerToken,
+      p_items: metaItems,
+      p_notes: String(notes || "").slice(0, 400),
     });
 
-    if (insertError) {
-      // orders.id is the primary key — a retried request for the same
-      // orderId (double-tap, network hiccup) lands here as a conflict, so
-      // hand back the order that's already there instead of erroring or
-      // double-booking stock for it.
-      if (insertError.code === "23505") {
-        const { data: existing } = await supabase
-          .from("orders").select("id, items, total, status").eq("id", orderId).maybeSingle();
-        if (existing) {
-          return new Response(JSON.stringify({ success: true, order: existing }), {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+    if (placeError) {
+      if (placeError.message?.includes("not_eligible")) {
+        return new Response(JSON.stringify({ error: "You don't have enough stamps for a free drink yet" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      console.error("Failed to write redeemed order:", insertError);
+      console.error("Failed to place redeemed order:", placeError);
       return new Response(JSON.stringify({ error: "Couldn't place your order, please try again" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { error: stockBookError } = await supabase.rpc("record_preorder_sale", { p_items: metaItems });
-    if (stockBookError) console.error("Failed to record preorder stock for redeemed order:", stockBookError);
-
     return new Response(
-      JSON.stringify({ success: true, order: { id: orderId, items: metaItems, total: 0, status: "Received" } }),
+      JSON.stringify({ success: true, order: placed }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
