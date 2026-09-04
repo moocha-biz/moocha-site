@@ -23,7 +23,7 @@ export default function App() {
       window.history.replaceState({}, '', window.location.pathname);
       refreshMyLoyalty().then(() => setTab('loyalty'));
       fireConfetti();
-      setPaymentResult({ type: 'success', orderId: params.get('order_id') });
+      setPaymentResult({ type: 'success', orderId: params.get('order_id'), sessionId: params.get('session_id') });
     } else if (params.get('stripe_canceled')) {
       window.history.replaceState({}, '', window.location.pathname);
       setTab('cart');

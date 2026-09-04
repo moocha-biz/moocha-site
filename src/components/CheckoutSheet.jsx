@@ -3,7 +3,7 @@ import { useMoocha } from '../store.jsx';
 import { money } from '../lib/storage.js';
 
 export default function CheckoutSheet({ onClose }) {
-  const { sb, myProfile, saveProfile, cart, cartSubtotal, showToast, settings } = useMoocha();
+  const { sb, myProfile, saveProfile, cart, cartSubtotal, showToast } = useMoocha();
   const [name, setName] = useState(myProfile?.name || '');
   const [phone, setPhone] = useState(myProfile?.phone || '');
   const [email, setEmail] = useState(myProfile?.email || '');
@@ -21,8 +21,9 @@ export default function CheckoutSheet({ onClose }) {
     const profile = { name: name.trim(), phone: phone.trim(), email: email.trim() };
     saveProfile(profile);
 
-    const amount = cartSubtotal;
-    const items = cart.map(l => ({ itemId: l.itemId, name: l.name, sugar: l.sugar, qty: l.qty, lineTotal: l.lineTotal }));
+    // Price/name are re-derived server-side from the items table — only
+    // itemId, sugar, and qty actually matter here, the rest is display-only.
+    const items = cart.map(l => ({ itemId: l.itemId, sugar: l.sugar, qty: l.qty }));
     // Always redirect back to the root, not wherever checkout happened to
     // be opened from (usually /cart) — App.jsx's stripe redirect handler
     // navigates to the right tab itself once it processes the result.
@@ -32,9 +33,12 @@ export default function CheckoutSheet({ onClose }) {
     try {
       const { data, error } = await sb.functions.invoke('create-checkout-session', {
         body: {
-          orderId, name: profile.name, phone: profile.phone, email: profile.email, notes: notes.trim(), items, amount,
-          stallName: settings.stallName,
-          successUrl: `${base}?stripe_success=1&order_id=${orderId}`,
+          orderId, name: profile.name, phone: profile.phone, email: profile.email, notes: notes.trim(), items,
+          // {CHECKOUT_SESSION_ID} is a literal Stripe placeholder — Stripe
+          // substitutes it with the real (high-entropy, unguessable)
+          // session id on redirect. That's what get_order_receipt looks
+          // orders up by now, instead of the guessable, 6-digit orderId.
+          successUrl: `${base}?stripe_success=1&order_id=${orderId}&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${base}?stripe_canceled=1`,
         },
       });

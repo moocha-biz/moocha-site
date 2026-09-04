@@ -320,15 +320,19 @@ export function MoochaProvider({ children }) {
       setMyStamps(mine ? (mine.stamps || 0) : 0);
       return;
     }
-    const { data, error } = await sb.rpc('get_my_stamps', { p_phone: p.phone });
+    // p_token is the per-customer secret handed back once in the receipt
+    // right after a paid order (see get_order_receipt / stripe-webhook) —
+    // without it, a phone number alone (an 8-digit, brute-forceable SG
+    // mobile number) can't unlock someone else's stamp count.
+    const { data, error } = await sb.rpc('get_my_stamps', { p_phone: p.phone, p_token: p.customerToken || null });
     if (error) { noteSupabaseError('Checking your stamp card', error); setMyStamps(0); return; }
     setMyStamps(data || 0);
   }, [myProfile, noteSupabaseError]);
 
-  const fetchMyOrders = useCallback(async (phone) => {
+  const fetchMyOrders = useCallback(async (phone, token) => {
     if (!phone) return [];
     if (!sb) return getLocal('demo_orders', []).filter(o => o.phone === phone);
-    const { data, error } = await sb.rpc('get_my_orders', { p_phone: phone });
+    const { data, error } = await sb.rpc('get_my_orders', { p_phone: phone, p_token: token || null });
     if (error) { noteSupabaseError('Loading your orders', error); return []; }
     return (data || []).map(r => ({ id: r.id, date: r.date, items: r.items, total: Number(r.total), status: r.status }));
   }, [noteSupabaseError]);
@@ -336,6 +340,19 @@ export function MoochaProvider({ children }) {
   const saveProfile = useCallback((profile) => {
     setMyProfile(profile);
     setLocal('moocha_my_profile', profile);
+  }, []);
+
+  // Called once, right after a paid order's receipt confirms a
+  // `customerToken` — merges it into the local profile so later
+  // get_my_stamps/get_my_orders calls can prove the phone is actually
+  // theirs instead of just guessing it.
+  const saveCustomerToken = useCallback((token) => {
+    if (!token) return;
+    setMyProfile(prev => {
+      const next = { ...(prev || {}), customerToken: token };
+      setLocal('moocha_my_profile', next);
+      return next;
+    });
   }, []);
 
   // ---------------- cart helpers ----------------
@@ -464,7 +481,7 @@ export function MoochaProvider({ children }) {
     // customer state
     tab, setTab, activeCat, setActiveCat,
     cart, cartSubtotal, addLineToCart, cartQty, updateLine, removeLine, clearCart,
-    myProfile, saveProfile, myStamps, refreshMyLoyalty, fetchMyOrders,
+    myProfile, saveProfile, saveCustomerToken, myStamps, refreshMyLoyalty, fetchMyOrders,
     // shared state
     menu, setMenu, settings, setSettings, ordersOpen, orders, setOrders, customers, setCustomers,
     lastSupabaseError, setLastSupabaseError,

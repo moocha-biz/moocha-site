@@ -87,6 +87,28 @@ Deno.serve(async (req) => {
       // isn't picked up yet at this point.
       const { error: stockError } = await supabase.rpc("record_preorder_sale", { p_items: items });
       if (stockError) console.error("Failed to record preorder stock:", stockError);
+
+      // Mint (once) the per-customer secret that get_my_stamps/get_my_orders
+      // require alongside a phone number — a phone number alone is
+      // brute-forceable, so without this any 8-digit SG mobile number could
+      // be used to read someone else's order history. This only ever runs
+      // for a genuinely paid order, and the token is only ever handed back
+      // once, inside this order's own receipt (get_order_receipt).
+      const phone = meta.phone || "";
+      if (phone) {
+        const { data: existing } = await supabase
+          .from("customers")
+          .select("access_token")
+          .eq("phone", phone)
+          .maybeSingle();
+        if (!existing) {
+          await supabase.from("customers").insert({
+            phone, name: meta.name || "", stamps: 0, access_token: crypto.randomUUID(),
+          });
+        } else if (!existing.access_token) {
+          await supabase.from("customers").update({ access_token: crypto.randomUUID() }).eq("phone", phone);
+        }
+      }
     }
   } else if (event.type === "checkout.session.expired") {
     // The PayNow QR timed out (or the customer closed the tab) before
