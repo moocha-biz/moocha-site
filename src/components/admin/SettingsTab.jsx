@@ -17,13 +17,15 @@ function fromLocalInputValue(local) {
 }
 
 export default function SettingsTab() {
-  const { sb, settings, setSettings, persistSettings, setCollectionHours, changeStaffPassword, showToast } = useMoocha();
+  const { sb, settings, setSettings, persistSettings, setCollectionHours, changeStaffPassword, staffEmail, showToast } = useMoocha();
   const [phone, setPhone] = useState(settings.stallPhone);
   const [name, setName] = useState(settings.stallName);
   const [collectionStart, setCollectionStart] = useState(toLocalInputValue(settings.collectionStart));
   const [collectionEnd, setCollectionEnd] = useState(toLocalInputValue(settings.collectionEnd));
   const [closeAt, setCloseAt] = useState(toLocalInputValue(settings.preorderCloseAt));
   const [ppNew, setPpNew] = useState('');
+  const [ppConfirm, setPpConfirm] = useState('');
+  const [ppVisible, setPpVisible] = useState(false);
 
   // Each save button stays disabled until its own fields diverge again
   // from what's actually saved — comparing straight against `settings`
@@ -63,8 +65,12 @@ export default function SettingsTab() {
   const submitChangePassword = async () => {
     if (!ppNew) { showToast('Enter a new password'); return; }
     if (ppNew.length < 6) { showToast('Use at least 6 characters'); return; }
+    // This is a single shared login every staff member uses — a typo here
+    // locks everyone out until someone resets it via the Supabase
+    // Dashboard, so it's worth catching before submitting, not after.
+    if (ppNew !== ppConfirm) { showToast("Passwords don't match"); return; }
     const { error } = await changeStaffPassword(ppNew);
-    if (!error) { showToast('Password changed ✓'); setPpNew(''); }
+    if (!error) { showToast('Password changed ✓'); setPpNew(''); setPpConfirm(''); }
     else showToast(error.message || 'Could not change password');
   };
 
@@ -77,7 +83,12 @@ export default function SettingsTab() {
             <div className="admin-item-name">Accepting orders</div>
             <div className="sub" style={{ fontSize: 12, color: 'var(--brand)' }}>Turn off to pause the customer app</div>
           </div>
-          <div className={`toggle ${settings.paymentEnabled ? 'on' : ''}`} onClick={togglePayment}><div className="knob" /></div>
+          <div
+            className={`toggle ${settings.paymentEnabled ? 'on' : ''}`}
+            role="switch" aria-checked={settings.paymentEnabled} aria-label="Accepting orders" tabIndex={0}
+            onClick={togglePayment}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePayment(); } }}
+          ><div className="knob" /></div>
         </div>
         {settings.preorderCloseAt && (
           <div className="section-note" style={{ marginTop: 4 }}>
@@ -111,10 +122,22 @@ export default function SettingsTab() {
       </div>
 
       <div className="settings-section" style={{ marginBottom: 0 }}>
-        <div className="section-label" style={{ marginTop: 0 }}>Staff password</div>
-        <div className="section-note">The shared login used at /admin. Changes take effect immediately for anyone signed in.</div>
-        <div className="field" style={{ marginBottom: 0 }}><label>New password</label><input type="password" value={ppNew} onChange={e => setPpNew(e.target.value)} /></div>
-        <button className="btn-secondary" style={{ marginTop: 14, marginBottom: 0 }} disabled={!ppNew} onClick={submitChangePassword}>Change password</button>
+        <div className="section-label" style={{ marginTop: 0 }}>Your password</div>
+        <div className="section-note">
+          {staffEmail ? `Changes the password for your own login (${staffEmail}) — no one else's.` : 'Changes the password for your own login only — no one else\'s.'}
+        </div>
+        <div className="field">
+          <label>New password</label>
+          <input type={ppVisible ? 'text' : 'password'} value={ppNew} onChange={e => setPpNew(e.target.value)} />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Confirm new password</label>
+          <input type={ppVisible ? 'text' : 'password'} value={ppConfirm} onChange={e => setPpConfirm(e.target.value)} />
+        </div>
+        <div style={{ textAlign: 'right', marginTop: 6 }}>
+          <span className="edit-link" onClick={() => setPpVisible(v => !v)}>{ppVisible ? 'Hide' : 'Show'} passwords</span>
+        </div>
+        <button className="btn-secondary" style={{ marginTop: 8, marginBottom: 0 }} disabled={!ppNew || !ppConfirm} onClick={submitChangePassword}>Change password</button>
       </div>
     </>
   );

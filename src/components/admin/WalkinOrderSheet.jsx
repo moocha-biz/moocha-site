@@ -13,9 +13,19 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState('');
 
   const allItems = Object.values(menu.categories).flat().filter(i => !i.isHidden);
   const itemById = Object.fromEntries(allItems.map(i => [i.id, i]));
+  // Grouped by category (like the menu editor) rather than one long flat
+  // list, so a menu with more than a handful of drinks stays scannable —
+  // and filtered by the same search box, so staff can jump straight to a
+  // drink by name during a rush instead of scrolling past everything else.
+  const q = query.trim().toLowerCase();
+  const categoryEntries = Object.keys(menu.categories).map(cat => ({
+    cat,
+    items: menu.categories[cat].filter(i => !i.isHidden && (!q || i.name.toLowerCase().includes(q))),
+  })).filter(({ items }) => items.length > 0);
   const sugarLevelsFor = (item) => (item.sugarLevels && item.sugarLevels.length) ? item.sugarLevels : DEFAULT_SUGAR_LEVELS;
   const remaining = (item) => item.walkinLimit == null ? null : Math.max(0, item.walkinLimit - (item.walkinSold || 0));
   const currentSugar = (item) => pendingSugar[item.id] || (sugarLevelsFor(item).includes('50%') ? '50%' : sugarLevelsFor(item)[0]);
@@ -86,30 +96,45 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
         </div>
       )}
 
-      {allItems.map(item => {
-        const cap = remaining(item);
-        const totalQty = qtyForItem(item.id);
-        const soldOutHere = item.soldout || cap === 0;
-        const atCap = cap != null && totalQty >= cap;
-        return (
-          <div className="admin-item-row" key={item.id}>
-            <div className="admin-item-top">
-              <div>
-                <div className="admin-item-name">{item.name}</div>
-                <div className="sub" style={{ fontSize: 12, color: 'var(--brand)' }}>
-                  {money(item.price)} {soldOutHere ? '· sold out' : (cap != null ? `· ${cap - totalQty} left` : '')}
+      <input className="search-input" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search menu…" />
+      {q && categoryEntries.length === 0 && <div className="empty-state">No items match "{query}".</div>}
+
+      {categoryEntries.map(({ cat, items }) => (
+        <div key={cat}>
+          <div className="section-label" style={{ fontSize: 16, margin: '14px 0 4px 0' }}>{cat}</div>
+          {items.map(item => {
+            const cap = remaining(item);
+            const totalQty = qtyForItem(item.id);
+            const soldOutHere = item.soldout || cap === 0;
+            const atCap = cap != null && totalQty >= cap;
+            return (
+              <div className="admin-item-row" key={item.id}>
+                <div className="admin-item-top">
+                  <div>
+                    <div className="admin-item-name" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      {item.name}
+                      {totalQty > 0 && (
+                        <span style={{ background: 'var(--green)', color: '#fff', fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 999 }}>
+                          {totalQty} in order
+                        </span>
+                      )}
+                    </div>
+                    <div className="sub" style={{ fontSize: 12, color: 'var(--brand)' }}>
+                      {money(item.price)} {soldOutHere ? '· sold out' : (cap != null ? `· ${cap - totalQty} left` : '')}
+                    </div>
+                  </div>
+                  <button className="btn-secondary btn-compact" disabled={soldOutHere || atCap} onClick={() => addUnit(item, currentSugar(item))}>+ Add</button>
+                </div>
+                <div className="opt-row" style={{ marginTop: 10 }}>
+                  {sugarLevelsFor(item).map(level => (
+                    <button key={level} className={`opt-chip ${currentSugar(item) === level ? 'selected' : ''}`} onClick={() => setPendingSugar(prev => ({ ...prev, [item.id]: level }))}>{level}</button>
+                  ))}
                 </div>
               </div>
-              <button className="btn-secondary btn-compact" disabled={soldOutHere || atCap} onClick={() => addUnit(item, currentSugar(item))}>+ Add</button>
-            </div>
-            <div className="opt-row" style={{ marginTop: 10 }}>
-              {sugarLevelsFor(item).map(level => (
-                <button key={level} className={`opt-chip ${currentSugar(item) === level ? 'selected' : ''}`} onClick={() => setPendingSugar(prev => ({ ...prev, [item.id]: level }))}>{level}</button>
-              ))}
-            </div>
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      ))}
 
       {lineEntries.length > 0 && (
         <>
@@ -132,9 +157,22 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
 
       <div className="field" style={{ marginTop: 16 }}><label>Notes (optional)</label><textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} /></div>
 
-      <div className="summary-row total" style={{ marginBottom: 14 }}><span>Total</span><span>{money(total)}</span></div>
-      <button className="btn-primary" disabled={busy || lines.length === 0} onClick={submit}><span>Log order</span><span>{money(total)}</span></button>
-      <button className="btn-secondary" onClick={onClose}>Cancel</button>
+      {/* Sticky rather than sitting after the item list — with a full menu
+          above it, staff would otherwise have to scroll past every drink
+          to reach Total/Log order on every single walk-in. Negative
+          margins cancel .sheet's own padding so this spans full width and
+          sits flush with the sheet's bottom edge while staying "inside"
+          its rounded corners. */}
+      <div style={{
+        position: 'sticky', bottom: -30, marginLeft: -20, marginRight: -20, marginBottom: -30,
+        background: 'var(--cream2)', padding: '14px 20px 30px 20px', boxShadow: '0 -6px 14px -10px rgba(0,0,0,0.25)',
+      }}>
+        <div className="summary-row total" style={{ marginBottom: 12 }}><span>Total</span><span>{money(total)}</span></div>
+        <button className="btn-primary" disabled={busy || lines.length === 0} onClick={submit}><span>{busy ? 'Logging…' : 'Log order'}</span><span>{money(total)}</span></button>
+        <div style={{ textAlign: 'center', marginTop: 10 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brand)', cursor: 'pointer' }} onClick={onClose}>Cancel</span>
+        </div>
+      </div>
     </>
   );
 }

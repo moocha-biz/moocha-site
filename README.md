@@ -60,15 +60,26 @@ connected — change it from Settings once you're live.
 
 ## 4. Optional: card payments via Stripe
 
-Three Supabase Edge Functions handle this — `create-checkout-session`
+Five Supabase Edge Functions handle this — `create-checkout-session`
 (creates the Stripe Checkout session when a customer taps "Pay with
-PayNow"), `stripe-webhook` (the only place an order actually gets
-written, once Stripe confirms payment), and `refund-order` (the only place
-staff can refund a Stripe-paid order from the admin dashboard's order
-detail view — a cash/walk-in order has no Stripe payment, so refunding one
-of those just updates the database directly). Nothing in the React app
-needs to change for this; `CheckoutSheet`/`OrderDetailSheet` already call
-`sb.functions.invoke(...)`.
+PayNow"; also handles redeeming a free drink alongside other paid items,
+discounting it to a $0 Stripe line item), `stripe-webhook` (the only place
+a paid order actually gets written, once Stripe confirms payment),
+`refund-order` (the only place staff can refund a Stripe-paid order from
+the admin dashboard's order detail view — a cash/walk-in/fully-redeemed
+order has no Stripe payment, so refunding one of those just updates the
+database directly), `get-order-payment` (read-only — pulls payment
+status/method/receipt for the order detail view's Stripe section, so staff
+don't have to look it up in the Stripe Dashboard by hand; the detail view
+also links straight to the matching Checkout Session there), and
+`redeem-order` (places a preorder that's *entirely* covered by a
+customer's loyalty reward — cart total $0 after redeeming — since Stripe
+Checkout can't process a $0 total at all; this writes the order directly,
+the same way the admin dashboard's walk-in flow logs a cash order). Both
+redemption paths re-verify eligibility (stamps ≥ goal) against the
+database using the customer's `access_token`, never trusting the client.
+Nothing in the React app needs to change for this; `CartView`/
+`CheckoutSheet`/`OrderDetailSheet` already call `sb.functions.invoke(...)`.
 
 1. Install the [Supabase CLI](https://supabase.com/docs/guides/cli) and
    link it to your project:
@@ -84,11 +95,13 @@ needs to change for this; `CheckoutSheet`/`OrderDetailSheet` already call
    ```
    The service role key (not the anon key) is under Project Settings >
    API — it must only ever live here, never in the React app.
-3. Deploy all three functions:
+3. Deploy all five functions:
    ```bash
    supabase functions deploy create-checkout-session
    supabase functions deploy stripe-webhook
    supabase functions deploy refund-order
+   supabase functions deploy get-order-payment
+   supabase functions deploy redeem-order
    ```
 4. In the Stripe Dashboard, add a webhook endpoint pointing to
    `https://your-project-ref.supabase.co/functions/v1/stripe-webhook`,
