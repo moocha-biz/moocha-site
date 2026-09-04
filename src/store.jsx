@@ -385,8 +385,14 @@ export function MoochaProvider({ children }) {
   }, [noteSupabaseError]);
 
   const saveProfile = useCallback((profile) => {
-    setMyProfile(profile);
-    setLocal('moocha_my_profile', profile);
+    // Merge rather than replace — callers like CheckoutSheet only pass
+    // name/phone/email, and a plain replace would wipe out customerToken,
+    // breaking get_my_stamps/get_my_orders until something re-mints it.
+    setMyProfile(prev => {
+      const next = { ...profile, customerToken: profile.customerToken ?? prev?.customerToken };
+      setLocal('moocha_my_profile', next);
+      return next;
+    });
   }, []);
 
   // Called once, right after a paid order's receipt confirms a
