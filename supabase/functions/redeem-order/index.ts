@@ -14,6 +14,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { ordersAreOpen } from "../_shared/ordersOpen.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -38,6 +39,16 @@ Deno.serve(async (req) => {
     if (!orderId || !trimmedPhone || !customerToken || cartLines.length === 0) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // The client only disables the Checkout button for this — nothing
+    // stopped a direct call here from placing an order while paused or
+    // past the scheduled cutoff, so it's re-checked for real.
+    if (!(await ordersAreOpen(supabase))) {
+      return new Response(JSON.stringify({ error: "Orders are closed right now — check back soon." }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
