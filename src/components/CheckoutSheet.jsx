@@ -23,7 +23,10 @@ export default function CheckoutSheet({ onClose }) {
 
     const amount = cartSubtotal;
     const items = cart.map(l => ({ itemId: l.itemId, name: l.name, sugar: l.sugar, qty: l.qty, lineTotal: l.lineTotal }));
-    const base = window.location.origin + window.location.pathname;
+    // Always redirect back to the root, not wherever checkout happened to
+    // be opened from (usually /cart) — App.jsx's stripe redirect handler
+    // navigates to the right tab itself once it processes the result.
+    const base = window.location.origin;
 
     showToast('Taking you to PayNow…');
     try {
@@ -37,14 +40,19 @@ export default function CheckoutSheet({ onClose }) {
       });
       if (error || !data?.url) {
         console.error(error);
-        showToast(data?.error || "PayNow isn't set up yet — try again later");
+        // data?.error carries a specific reason when the server actually
+        // rejected the request (e.g. a stock-limit message) — only fall
+        // back to a generic network-ish message when there isn't one, so
+        // this never falsely claims PayNow "isn't set up" for what's
+        // really a dropped connection or a one-off server hiccup.
+        showToast(data?.error || "Couldn't start checkout — check your connection and try again");
         setBusy(false);
         return;
       }
       window.location.href = data.url;
     } catch (err) {
       console.error(err);
-      showToast("PayNow isn't set up yet — try again later");
+      showToast("Couldn't reach checkout — check your connection and try again");
       setBusy(false);
     }
   };

@@ -23,7 +23,11 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
 
   const addUnit = (item, sugar) => {
     const cap = remaining(item);
-    if (cap != null && qtyForItem(item.id) + 1 > cap) { showToast(`Only ${cap - qtyForItem(item.id)} left for walk-in`); return; }
+    if (cap != null && qtyForItem(item.id) + 1 > cap) {
+      const left = cap - qtyForItem(item.id);
+      showToast(left > 0 ? `Only ${left} left for walk-in` : 'No more left for walk-in this week');
+      return;
+    }
     const key = `${item.id}::${sugar}`;
     setLinesByKey(prev => ({ ...prev, [key]: { itemId: item.id, name: item.name, price: item.price, sugar, qty: (prev[key]?.qty || 0) + 1 } }));
   };
@@ -72,7 +76,7 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
     <>
       <div className="sheet-close" />
       <div className="sheet-title">New walk-in order</div>
-      <div className="sheet-sub">Collected on the spot — stamped immediately if a phone number is given.</div>
+      <div className="sheet-sub">Logged as Received — mark it collected once handed over to award the stamp.</div>
 
       <div className="field"><label>Customer name (optional)</label><input value={name} onChange={e => setName(e.target.value)} /></div>
       <div className="field"><label>Phone (optional — needed for a stamp)</label><input value={phone} onChange={e => { setPhone(e.target.value); setRedeemKey(null); }} inputMode="tel" /></div>
@@ -96,7 +100,7 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
                   {money(item.price)} {soldOutHere ? '· sold out' : (cap != null ? `· ${cap - totalQty} left` : '')}
                 </div>
               </div>
-              <button className="btn-secondary" style={{ width: 'auto', padding: '7px 14px', margin: 0 }} disabled={soldOutHere || atCap} onClick={() => addUnit(item, currentSugar(item))}>+ Add</button>
+              <button className="btn-secondary btn-compact" disabled={soldOutHere || atCap} onClick={() => addUnit(item, currentSugar(item))}>+ Add</button>
             </div>
             <div className="opt-row" style={{ marginTop: 10 }}>
               {sugarLevelsFor(item).map(level => (

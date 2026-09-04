@@ -28,6 +28,7 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
     setCustomers(await fetchCustomers());
     onClose();
     onChanged?.();
+    showToast('Customer deleted ✓');
   };
 
   return (

@@ -28,7 +28,7 @@ function TagsEditor({ tags, setTags }) {
             style={{ flex: 1, border: '2px solid var(--line)', background: 'var(--paper)', borderRadius: 12, padding: '9px 12px', fontWeight: 700, fontSize: 13.5, color: 'var(--green-dark)' }}
             onChange={e => update(i, 'text', e.target.value)}
           />
-          <button className="icon-btn danger" onClick={() => remove(i)}>✕</button>
+          <button className="icon-btn danger" title="Remove" onClick={() => remove(i)}>✕</button>
         </div>
       ))}
       {tags.some(t => t.text) && (
@@ -77,7 +77,7 @@ function RowsEditor({ label, rows, setRows, withPrice, addLabel, emptyNote }) {
               onChange={e => { const next = [...rows]; next[i] = e.target.value; setRows(next); }}
             />
           )}
-          <button className="icon-btn danger" onClick={() => remove(i)}>✕</button>
+          <button className="icon-btn danger" title="Remove" onClick={() => remove(i)}>✕</button>
         </div>
       ))}
       <button className="btn-secondary" onClick={add}>{addLabel}</button>
@@ -118,7 +118,7 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
       const path = `item-${Date.now()}.${ext}`;
       const { error } = await sb.storage.from('menu-photos').upload(path, file, { upsert: true });
       setUploading(false);
-      if (error) { console.error(error); showToast('Upload failed — try again'); URL.revokeObjectURL(localPreview); setPhotoUrl(item?.photo || null); return; }
+      if (error) { console.error(error); showToast(`Upload failed — ${error.message || 'try again'}`); URL.revokeObjectURL(localPreview); setPhotoUrl(item?.photo || null); return; }
       const { data } = sb.storage.from('menu-photos').getPublicUrl(path);
       URL.revokeObjectURL(localPreview);
       setPhotoUrl(data.publicUrl);
@@ -149,6 +149,7 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
     });
     onSaved?.();
     onClose();
+    showToast(item ? 'Item saved ✓' : 'Item added ✓');
   };
 
   return (

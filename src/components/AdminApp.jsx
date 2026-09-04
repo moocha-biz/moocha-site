@@ -14,8 +14,8 @@ const TABS = [
   { id: 'settings', label: 'Settings' },
 ];
 
-export default function AdminApp({ onExit }) {
-  const { sb, adminTab, setAdminTab, refreshAdminData, lastSupabaseError, setLastSupabaseError } = useMoocha();
+export default function AdminApp() {
+  const { sb, adminTab, setAdminTab, refreshAdminData, logOut, lastSupabaseError, setLastSupabaseError } = useMoocha();
 
   return (
     <div className="app" id="adminApp" style={{ display: 'flex' }}>
@@ -23,7 +23,7 @@ export default function AdminApp({ onExit }) {
         <div className="heading">🐮 moocha staff</div>
         <div className="admin-header-btns">
           <button className="admin-back" onClick={() => refreshAdminData().then(() => setAdminTab(adminTab))}>↻ Refresh</button>
-          <button className="admin-back" onClick={onExit}>Back to app</button>
+          <button className="admin-back" onClick={logOut}>Log out</button>
         </div>
       </div>
       <div className="admin-tabs">

@@ -20,9 +20,9 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
     let cancelled = false;
 
     const poll = async (attempt) => {
-      const { data } = await sb.from('orders').select('*').eq('id', result.orderId).maybeSingle();
+      const { data } = await sb.rpc('get_order_receipt', { p_id: result.orderId });
       if (cancelled) return;
-      if (data) { setOrder(data); return; }
+      if (data && data.id) { setOrder(data); return; }
       if (attempt >= POLL_ATTEMPTS) { setGaveUp(true); return; }
       setTimeout(() => poll(attempt + 1), POLL_INTERVAL_MS);
     };

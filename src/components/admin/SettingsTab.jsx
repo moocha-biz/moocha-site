@@ -17,13 +17,12 @@ function fromLocalInputValue(local) {
 }
 
 export default function SettingsTab() {
-  const { sb, settings, setSettings, persistSettings, setCollectionHours, changeStaffPassphrase, showToast } = useMoocha();
+  const { sb, settings, setSettings, persistSettings, setCollectionHours, changeStaffPassword, showToast } = useMoocha();
   const [phone, setPhone] = useState(settings.stallPhone);
   const [name, setName] = useState(settings.stallName);
   const [collectionStart, setCollectionStart] = useState(toLocalInputValue(settings.collectionStart));
   const [collectionEnd, setCollectionEnd] = useState(toLocalInputValue(settings.collectionEnd));
   const [closeAt, setCloseAt] = useState(toLocalInputValue(settings.preorderCloseAt));
-  const [ppOld, setPpOld] = useState('');
   const [ppNew, setPpNew] = useState('');
 
   // Each save button stays disabled until its own fields diverge again
@@ -44,7 +43,7 @@ export default function SettingsTab() {
     const next = { ...settings, stallPhone: phone.trim(), stallName: name.trim() };
     setSettings(next);
     await persistSettings(next);
-    showToast('Settings saved');
+    showToast('Settings saved ✓');
   };
 
   const saveAutoClose = async () => {
@@ -61,12 +60,12 @@ export default function SettingsTab() {
     showToast('Collection hours saved — stock counts reset ✓');
   };
 
-  const submitChangePassphrase = async () => {
-    if (!ppOld || !ppNew) { showToast('Fill in both fields'); return; }
+  const submitChangePassword = async () => {
+    if (!ppNew) { showToast('Enter a new password'); return; }
     if (ppNew.length < 6) { showToast('Use at least 6 characters'); return; }
-    const ok = await changeStaffPassphrase(ppOld, ppNew);
-    if (ok) { showToast('Passphrase changed ✓'); setPpOld(''); setPpNew(''); }
-    else showToast('Current passphrase was wrong');
+    const { error } = await changeStaffPassword(ppNew);
+    if (!error) { showToast('Password changed ✓'); setPpNew(''); }
+    else showToast(error.message || 'Could not change password');
   };
 
   return (
@@ -112,11 +111,10 @@ export default function SettingsTab() {
       </div>
 
       <div className="settings-section" style={{ marginBottom: 0 }}>
-        <div className="section-label" style={{ marginTop: 0 }}>Staff passphrase</div>
-        <div className="section-note">Used to unlock this dashboard from the gear icon.</div>
-        <div className="field"><label>Current passphrase</label><input type="password" value={ppOld} onChange={e => setPpOld(e.target.value)} /></div>
-        <div className="field" style={{ marginBottom: 0 }}><label>New passphrase</label><input type="password" value={ppNew} onChange={e => setPpNew(e.target.value)} /></div>
-        <button className="btn-secondary" style={{ marginTop: 14, marginBottom: 0 }} disabled={!ppOld || !ppNew} onClick={submitChangePassphrase}>Change passphrase</button>
+        <div className="section-label" style={{ marginTop: 0 }}>Staff password</div>
+        <div className="section-note">The shared login used at /admin. Changes take effect immediately for anyone signed in.</div>
+        <div className="field" style={{ marginBottom: 0 }}><label>New password</label><input type="password" value={ppNew} onChange={e => setPpNew(e.target.value)} /></div>
+        <button className="btn-secondary" style={{ marginTop: 14, marginBottom: 0 }} disabled={!ppNew} onClick={submitChangePassword}>Change password</button>
       </div>
     </>
   );

@@ -1,13 +1,20 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMoocha, STAMP_GOAL } from '../store.jsx';
 import { money } from '../lib/storage.js';
 import StampCard from './StampCard.jsx';
 
 export default function LoyaltyView() {
-  const { myProfile, myStamps, orders } = useMoocha();
+  const { myProfile, myStamps, fetchMyOrders } = useMoocha();
   const myPhone = myProfile ? myProfile.phone : null;
-  const myOrders = myPhone ? orders.filter(o => o.phone === myPhone) : [];
   const totalStamps = myStamps || 0;
+  const [myOrders, setMyOrders] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!myPhone) { setMyOrders([]); return; }
+    fetchMyOrders(myPhone).then(list => { if (!cancelled) setMyOrders(list); });
+    return () => { cancelled = true; };
+  }, [myPhone, fetchMyOrders]);
 
   return (
     <>

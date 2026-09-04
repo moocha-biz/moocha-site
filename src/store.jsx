@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { sb } from './lib/supabaseClient.js';
 import { getLocal, setLocal } from './lib/storage.js';
 import {
@@ -14,9 +15,30 @@ export function useMoocha() {
   return ctx;
 }
 
+// Keeps every existing tab/setTab consumer (TabBar, desktop nav, the
+// Stripe-redirect handler in App.jsx) working unchanged — `tab` now just
+// derives from the URL instead of being independent state, and `setTab`
+// navigates instead of setting a local flag. That's what makes /menu,
+// /cart and /rewards real, bookmarkable, shareable URLs.
+function tabFromPath(pathname) {
+  if (pathname.startsWith('/cart')) return 'cart';
+  if (pathname.startsWith('/rewards')) return 'loyalty';
+  return 'menu';
+}
+function pathFromTab(tab) {
+  if (tab === 'cart') return '/cart';
+  if (tab === 'loyalty') return '/rewards';
+  return '/menu';
+}
+
 export function MoochaProvider({ children }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   // ---------------- customer-facing state ----------------
-  const [tab, setTab] = useState('menu');
+  const [tab, setTabState] = useState(() => tabFromPath(location.pathname));
+  useEffect(() => { setTabState(tabFromPath(location.pathname)); }, [location.pathname]);
+  const setTab = useCallback((next) => navigate(pathFromTab(next)), [navigate]);
   const [activeCat, setActiveCat] = useState(null);
   const [cart, setCart] = useState(() => getLocal('moocha_cart', []));
   const [myProfile, setMyProfile] = useState(() => getLocal('moocha_my_profile', null));
@@ -30,8 +52,21 @@ export function MoochaProvider({ children }) {
   const [lastSupabaseError, setLastSupabaseError] = useState(null);
 
   // ---------------- admin / staff state ----------------
-  const [isAdmin, setIsAdmin] = useState(false);
+  // isAdmin is derived from a real Supabase Auth session, not a plain flag
+  // — so it persists across reloads (the session is stored by supabase-js)
+  // and every write RLS now gates on `to authenticated` actually means
+  // something, instead of just hiding the UI for an anon-key holder who
+  // could otherwise call the API directly.
+  const [session, setSession] = useState(null);
+  const isAdmin = !!session;
   const [adminTab, setAdminTab] = useState('sales');
+
+  useEffect(() => {
+    if (!sb) return;
+    sb.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = sb.auth.onAuthStateChange((_event, next) => setSession(next));
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   // ---------------- UI/overlay state ----------------
   const [toast, setToastMsg] = useState(null);
@@ -53,7 +88,7 @@ export function MoochaProvider({ children }) {
     if (!sb) return getLocal('demo_orders', []);
     const { data, error } = await sb.from('orders').select('*').order('date', { ascending: false });
     if (error) { noteSupabaseError('Loading orders', error); return []; }
-    return data.map(r => ({ id: r.id, name: r.name, phone: r.phone, date: r.date, items: r.items, total: Number(r.total), notes: r.notes, status: r.status, orderType: r.order_type, collectedAt: r.collected_at }));
+    return data.map(r => ({ id: r.id, name: r.name, phone: r.phone, date: r.date, items: r.items, total: Number(r.total), notes: r.notes, status: r.status, orderType: r.order_type, collectedAt: r.collected_at, stripeSessionId: r.stripe_session_id }));
   }, [noteSupabaseError]);
 
   const fetchSettings = useCallback(async () => {
@@ -203,8 +238,7 @@ export function MoochaProvider({ children }) {
   const logWalkinOrder = useCallback(async ({ id, name, phone, items, total, notes }) => {
     if (!sb) {
       const list = getLocal('demo_orders', []);
-      const now = new Date().toISOString();
-      list.unshift({ id, name, phone, date: now, items, total, notes, status: 'Collected', orderType: 'walkin', collectedAt: now });
+      list.unshift({ id, name, phone, date: new Date().toISOString(), items, total, notes, status: 'Received', orderType: 'walkin', collectedAt: null });
       setLocal('demo_orders', list);
       setOrders(list);
       return { error: null };
@@ -274,31 +308,30 @@ export function MoochaProvider({ children }) {
     if (error) noteSupabaseError('Deleting customer', error);
   }, [noteSupabaseError]);
 
-  const checkStaffPassphrase = useCallback(async (candidate) => {
-    if (!sb) return candidate === getLocal(DEMO_PASSPHRASE_KEY, DEMO_DEFAULT_PASSPHRASE);
-    const { data, error } = await sb.rpc('check_staff_pin', { candidate });
-    if (error) { noteSupabaseError('Checking passphrase', error); return false; }
-    return data === true;
-  }, [noteSupabaseError]);
-
-  const changeStaffPassphrase = useCallback(async (oldPass, newPass) => {
-    if (!sb) {
-      if (oldPass !== getLocal(DEMO_PASSPHRASE_KEY, DEMO_DEFAULT_PASSPHRASE)) return false;
-      setLocal(DEMO_PASSPHRASE_KEY, newPass);
-      return true;
-    }
-    const { data, error } = await sb.rpc('set_staff_pin', { old_pin: oldPass, new_pin: newPass });
-    if (error) { noteSupabaseError('Changing passphrase', error); return false; }
-    return data === true;
-  }, [noteSupabaseError]);
-
+  // Customers never sign in, so their own stamp count and order history
+  // can't come from the customers/orders tables directly anymore (those
+  // are staff-only now) — these two narrow RPCs are the replacement.
   const refreshMyLoyalty = useCallback(async (profile) => {
     const p = profile !== undefined ? profile : myProfile;
     if (!p) { setMyStamps(0); return; }
-    const list = await fetchCustomers();
-    const mine = list.find(c => c.phone === p.phone);
-    setMyStamps(mine ? (mine.stamps || 0) : 0);
-  }, [fetchCustomers, myProfile]);
+    if (!sb) {
+      const list = getLocal('demo_customers', []);
+      const mine = list.find(c => c.phone === p.phone);
+      setMyStamps(mine ? (mine.stamps || 0) : 0);
+      return;
+    }
+    const { data, error } = await sb.rpc('get_my_stamps', { p_phone: p.phone });
+    if (error) { noteSupabaseError('Checking your stamp card', error); setMyStamps(0); return; }
+    setMyStamps(data || 0);
+  }, [myProfile, noteSupabaseError]);
+
+  const fetchMyOrders = useCallback(async (phone) => {
+    if (!phone) return [];
+    if (!sb) return getLocal('demo_orders', []).filter(o => o.phone === phone);
+    const { data, error } = await sb.rpc('get_my_orders', { p_phone: phone });
+    if (error) { noteSupabaseError('Loading your orders', error); return []; }
+    return (data || []).map(r => ({ id: r.id, date: r.date, items: r.items, total: Number(r.total), status: r.status }));
+  }, [noteSupabaseError]);
 
   const saveProfile = useCallback((profile) => {
     setMyProfile(profile);
@@ -358,14 +391,16 @@ export function MoochaProvider({ children }) {
   }, [saveCartLocal]);
 
   // ---------------- initial + polling load ----------------
+  // Deliberately doesn't fetch orders — that table is staff-only now, so
+  // an anon customer session couldn't read it anyway. refreshAdminData()
+  // (below) is the staff-only equivalent that does load it.
   const loadShared = useCallback(async () => {
-    const [s, m, o] = await Promise.all([fetchSettings(), fetchMenuData(), fetchOrders()]);
+    const [s, m] = await Promise.all([fetchSettings(), fetchMenuData()]);
     setSettings(s);
     setMenu(m);
-    setOrders(o);
     setActiveCat(prev => prev || Object.keys(m.categories)[0]);
     await refreshMyLoyalty(myProfile);
-  }, [fetchSettings, fetchMenuData, fetchOrders, refreshMyLoyalty, myProfile]);
+  }, [fetchSettings, fetchMenuData, refreshMyLoyalty, myProfile]);
 
   useEffect(() => {
     loadShared();
@@ -387,15 +422,37 @@ export function MoochaProvider({ children }) {
     setOrders(o); setMenu(m); setSettings(s); setCustomers(c);
   }, [fetchOrders, fetchMenuData, fetchSettings, fetchCustomers]);
 
-  const enterAdmin = useCallback(async () => {
-    setIsAdmin(true);
-    await refreshAdminData();
+  // Fires whenever a session appears — a fresh sign-in, or a persisted
+  // session restored on reload — so both paths load admin data the same
+  // way without PinModal needing to call anything explicitly.
+  useEffect(() => {
+    if (!isAdmin) return;
+    refreshAdminData();
     setAdminTab('sales');
-  }, [refreshAdminData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
 
-  const exitAdmin = useCallback(() => {
-    setIsAdmin(false);
+  const logOut = useCallback(async () => {
+    if (sb) await sb.auth.signOut();
+    navigate('/admin');
+  }, [navigate]);
+
+  const signInStaff = useCallback(async (email, password) => {
+    if (!sb) {
+      const ok = password === getLocal(DEMO_PASSPHRASE_KEY, DEMO_DEFAULT_PASSPHRASE);
+      if (ok) setSession({ demo: true });
+      return { error: ok ? null : { message: 'Wrong passphrase' } };
+    }
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    return { error };
   }, []);
+
+  const changeStaffPassword = useCallback(async (newPassword) => {
+    if (!sb) { setLocal(DEMO_PASSPHRASE_KEY, newPassword); return { error: null }; }
+    const { error } = await sb.auth.updateUser({ password: newPassword });
+    if (error) noteSupabaseError('Changing password', error);
+    return { error };
+  }, [noteSupabaseError]);
 
   // Recomputed on every render (settings.paymentEnabled changing, or the
   // 8s background poll refreshing settings, both trigger one) — no timer
@@ -407,12 +464,12 @@ export function MoochaProvider({ children }) {
     // customer state
     tab, setTab, activeCat, setActiveCat,
     cart, cartSubtotal, addLineToCart, cartQty, updateLine, removeLine, clearCart,
-    myProfile, saveProfile, myStamps, refreshMyLoyalty,
+    myProfile, saveProfile, myStamps, refreshMyLoyalty, fetchMyOrders,
     // shared state
     menu, setMenu, settings, setSettings, ordersOpen, orders, setOrders, customers, setCustomers,
     lastSupabaseError, setLastSupabaseError,
     // admin
-    isAdmin, adminTab, setAdminTab, enterAdmin, exitAdmin, refreshAdminData,
+    isAdmin, adminTab, setAdminTab, logOut, refreshAdminData, signInStaff, changeStaffPassword,
     // toast
     toast, showToast,
     // backend actions
@@ -420,7 +477,6 @@ export function MoochaProvider({ children }) {
     menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuSaveItem,
     persistSettings, setCollectionHours, deleteOrder, logWalkinOrder, markOrderCollected,
     setCustomerStamps, deleteCustomerRecord,
-    checkStaffPassphrase, changeStaffPassphrase,
     noteSupabaseError,
   };
 
