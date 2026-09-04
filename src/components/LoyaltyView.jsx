@@ -6,15 +6,16 @@ import StampCard from './StampCard.jsx';
 export default function LoyaltyView() {
   const { myProfile, myStamps, fetchMyOrders } = useMoocha();
   const myPhone = myProfile ? myProfile.phone : null;
+  const myToken = myProfile ? myProfile.customerToken : null;
   const totalStamps = myStamps || 0;
   const [myOrders, setMyOrders] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
     if (!myPhone) { setMyOrders([]); return; }
-    fetchMyOrders(myPhone).then(list => { if (!cancelled) setMyOrders(list); });
+    fetchMyOrders(myPhone, myToken).then(list => { if (!cancelled) setMyOrders(list); });
     return () => { cancelled = true; };
-  }, [myPhone, fetchMyOrders]);
+  }, [myPhone, myToken, fetchMyOrders]);
 
   return (
     <>

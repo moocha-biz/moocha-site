@@ -9,26 +9,37 @@ const POLL_ATTEMPTS = 8;
 const POLL_INTERVAL_MS = 1200;
 
 export default function PaymentResultModal({ result, onClose, onRetry }) {
-  const { sb } = useMoocha();
+  const { sb, saveCustomerToken } = useMoocha();
   const [order, setOrder] = useState(null);
   const [gaveUp, setGaveUp] = useState(false);
 
   useEffect(() => {
     setOrder(null);
     setGaveUp(false);
-    if (result?.type !== 'success' || !sb || !result.orderId) return;
+    // Keyed on Stripe's own session id (high-entropy, only known to this
+    // browser via Stripe's redirect), not the human-readable orderId —
+    // that id is just a 6-digit timestamp suffix and would let anyone
+    // enumerate other customers' receipts.
+    if (result?.type !== 'success' || !sb || !result.sessionId) return;
     let cancelled = false;
 
     const poll = async (attempt) => {
-      const { data } = await sb.rpc('get_order_receipt', { p_id: result.orderId });
+      const { data } = await sb.rpc('get_order_receipt', { p_session_id: result.sessionId });
       if (cancelled) return;
-      if (data && data.id) { setOrder(data); return; }
+      if (data && data.id) {
+        setOrder(data);
+        // Handed back once, right after a confirmed paid order — this is
+        // what lets My Rewards later prove "this phone is actually mine"
+        // instead of anyone being able to type in any phone number.
+        if (data.customerToken) saveCustomerToken(data.customerToken);
+        return;
+      }
       if (attempt >= POLL_ATTEMPTS) { setGaveUp(true); return; }
       setTimeout(() => poll(attempt + 1), POLL_INTERVAL_MS);
     };
     poll(1);
     return () => { cancelled = true; };
-  }, [result, sb]);
+  }, [result, sb, saveCustomerToken]);
 
   if (!result) return null;
 
