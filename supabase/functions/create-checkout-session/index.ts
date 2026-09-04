@@ -20,6 +20,9 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+// Keep in sync with STAMP_GOAL in src/data/defaults.js.
+const STAMP_GOAL = 8;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -27,7 +30,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { orderId, name, phone, email, notes, items, successUrl, cancelUrl } = body;
+    const { orderId, name, phone, email, notes, items, successUrl, cancelUrl, customerToken } = body;
 
     // deno-lint-ignore no-explicit-any
     const cartLines = (items || []) as any[];
@@ -36,6 +39,42 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // At most one cart line can carry the customer's loyalty redemption
+    // (1 free unit) — the client flags it, but eligibility is re-verified
+    // here from the database, never trusted from the request. A fully-free
+    // cart (redeeming with nothing else in it) can't come through this
+    // endpoint at all: Stripe Checkout requires a total > 0, so that case
+    // is handled by the separate redeem-order function instead.
+    const redeemedLines = cartLines.filter((l) => l.redeemed === true);
+    if (redeemedLines.length > 1) {
+      return new Response(JSON.stringify({ error: "Only one item can be redeemed as your free drink" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const redeeming = redeemedLines.length === 1;
+    if (redeeming) {
+      const trimmedPhone = String(phone || "").trim();
+      if (!trimmedPhone || !customerToken) {
+        return new Response(JSON.stringify({ error: "Reload My Rewards and try again to redeem your free drink" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: rewardRow } = await supabase
+        .from("customers")
+        .select("stamps")
+        .eq("phone", trimmedPhone)
+        .eq("access_token", customerToken)
+        .maybeSingle();
+      if (!rewardRow || (rewardRow.stamps || 0) < STAMP_GOAL) {
+        return new Response(JSON.stringify({ error: "You don't have enough stamps for a free drink yet" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const itemIds = cartLines.map((i) => i.itemId).filter(Boolean);
@@ -101,15 +140,39 @@ Deno.serve(async (req) => {
         }
       }
       const unitAmount = Math.round(Number(row.price) * 100);
-      lineItems.push({
-        price_data: {
-          currency: "sgd",
-          product_data: { name: String(row.name).slice(0, 250) },
-          unit_amount: unitAmount,
-        },
-        quantity: qty,
+      const isRedeemedLine = redeeming && line.redeemed === true;
+      // Only 1 unit of the redeemed line is free — split it into a normal
+      // full-price line for the rest of the quantity (omitted entirely if
+      // qty is exactly 1) plus a separate $0 line for that one unit, so the
+      // Stripe receipt still itemizes the drink instead of hiding it.
+      const paidQty = isRedeemedLine ? qty - 1 : qty;
+      if (paidQty > 0) {
+        lineItems.push({
+          price_data: { currency: "sgd", product_data: { name: String(row.name).slice(0, 250) }, unit_amount: unitAmount },
+          quantity: paidQty,
+        });
+      }
+      if (isRedeemedLine) {
+        lineItems.push({
+          price_data: { currency: "sgd", product_data: { name: `${String(row.name).slice(0, 230)} (reward)` }, unit_amount: 0 },
+          quantity: 1,
+        });
+      }
+      metaItems.push({
+        itemId: row.id, name: row.name, sugar: line.sugar, qty, lineTotal: (unitAmount * paidQty) / 100,
+        ...(isRedeemedLine ? { redeemed: true } : {}),
       });
-      metaItems.push({ itemId: row.id, name: row.name, sugar: line.sugar, qty, lineTotal: (unitAmount * qty) / 100 });
+    }
+
+    // A fully-redeemed cart (nothing paid at all) can't be charged through
+    // Stripe Checkout, which requires a total greater than zero — the
+    // frontend is expected to route that case to redeem-order instead, so
+    // landing here means something upstream didn't branch correctly.
+    if (redeeming && lineItems.every((li) => li.price_data.unit_amount === 0)) {
+      return new Response(
+        JSON.stringify({ error: "This order is fully covered by your reward — try checking out again" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const trimmedEmail = String(email || "").trim();

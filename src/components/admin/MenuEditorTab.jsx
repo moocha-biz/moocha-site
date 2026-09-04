@@ -4,6 +4,31 @@ import { money } from '../../lib/storage.js';
 import Overlay from '../Overlay.jsx';
 import ItemEditorSheet from './ItemEditorSheet.jsx';
 
+// Surfaces preorder/walk-in stock right in the list — previously only
+// visible after opening the item editor — so staff can spot a
+// running-low or sold-out item without a click per item.
+function StockLine({ item }) {
+  const parts = [];
+  if (item.preorderLimit != null) {
+    const left = Math.max(0, item.preorderLimit - (item.preorderSold || 0));
+    parts.push({ label: `Preorder: ${left}/${item.preorderLimit} left`, low: left === 0, warn: left > 0 && left < 5 });
+  }
+  if (item.walkinLimit != null) {
+    const left = Math.max(0, item.walkinLimit - (item.walkinSold || 0));
+    parts.push({ label: `Walk-in: ${left}/${item.walkinLimit} left`, low: left === 0, warn: left > 0 && left < 5 });
+  }
+  if (parts.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+      {parts.map((p, i) => (
+        <span key={i} className={p.low ? 'soldout-tag' : p.warn ? 'low-stock-tag' : ''} style={p.low || p.warn ? undefined : { fontSize: 10.5, fontWeight: 800, color: 'var(--brand)', padding: '3px 10px', borderRadius: 999, background: 'var(--mint)' }}>
+          {p.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function MenuEditorTab() {
   const { menu, menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, showToast } = useMoocha();
   const [editing, setEditing] = useState(null); // { cat, item }
@@ -17,7 +42,9 @@ export default function MenuEditorTab() {
     showToast('Category added ✓');
   };
   const deleteCategory = (cat) => {
-    if (!window.confirm(`Delete "${cat}" and all its items?`)) return;
+    const count = (menu.categories[cat] || []).length;
+    const itemsPhrase = count > 0 ? `and its ${count} item${count === 1 ? '' : 's'}` : '(it has no items)';
+    if (!window.confirm(`Delete "${cat}" ${itemsPhrase}?`)) return;
     menuDeleteCategory(cat);
     showToast('Category deleted ✓');
   };
@@ -53,6 +80,7 @@ export default function MenuEditorTab() {
                   <div>
                     <div className="admin-item-name">{item.name}</div>
                     <div className="sub" style={{ fontSize: 12, color: 'var(--brand)' }}>{money(item.price)} {item.soldout ? '· sold out' : ''} {item.isHidden ? '· hidden' : ''}</div>
+                    <StockLine item={item} />
                   </div>
                   <div className="admin-item-actions">
                     <button className="icon-btn" title="Edit item" onClick={() => setEditing({ cat, item })}>✎</button>

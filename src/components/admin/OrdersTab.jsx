@@ -5,6 +5,7 @@ import { exportToExcel } from '../../lib/exportXlsx.js';
 import Overlay from '../Overlay.jsx';
 import WalkinOrderSheet from './WalkinOrderSheet.jsx';
 import OrderDetailSheet from './OrderDetailSheet.jsx';
+import StatusBadge from './StatusBadge.jsx';
 
 const TYPE_FILTERS = [{ key: 'all', label: 'All types' }, { key: 'preorder', label: 'Preorder' }, { key: 'walkin', label: 'Walk-in' }];
 const STATUS_FILTERS = [{ key: 'all', label: 'All statuses' }, { key: 'Received', label: 'Received' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }, { key: 'Payment failed', label: 'Payment failed' }];
@@ -120,7 +121,10 @@ export default function OrdersTab() {
             <div className="oid">#{o.id} · {new Date(o.date).toLocaleString()}</div>
             <div className="oitems">{o.name} · {o.phone}</div>
             <div className="sub" style={{ fontSize: 12, color: 'var(--brand)', marginTop: 2 }}>{o.items.map(i => `${i.name} x${i.qty}`).join(', ')}</div>
-            <span className="order-status">{o.orderType === 'walkin' ? '🚶 Walk-in' : '📦 Preorder'} · {o.status}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand)' }}>{o.orderType === 'walkin' ? '🚶 Walk-in' : '📦 Preorder'}</span>
+              <StatusBadge status={o.status} />
+            </div>
           </div>
           <div className="order-row-right">
             <div className="oprice">{money(o.total)}</div>

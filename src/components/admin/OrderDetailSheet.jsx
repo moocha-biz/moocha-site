@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMoocha } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
+import StatusBadge, { Badge } from './StatusBadge.jsx';
 
 // A paid/logged order only ever exists as a row once payment (or the
 // walk-in log) already succeeded, so there's no meaningful "awaiting
@@ -46,6 +47,96 @@ function OrderProgress({ status }) {
   );
 }
 
+// Stripe's own dashboard is the source of truth for a payment — this just
+// builds a direct deep link to it from the checkout session id, so staff
+// don't have to search for it by hand. cs_test_... vs cs_live_... tells us
+// which dashboard mode to link into.
+function stripeDashboardUrl(sessionId) {
+  const mode = sessionId.startsWith('cs_test_') ? 'test/' : '';
+  return `https://dashboard.stripe.com/${mode}checkout/sessions/${sessionId}`;
+}
+
+function DetailRow({ label, value }) {
+  if (value == null || value === '') return null;
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12.5, fontWeight: 700, color: '#5b6e54', padding: '3px 0' }}>
+      <span style={{ color: 'var(--brand)' }}>{label}</span>
+      <span style={{ textAlign: 'right' }}>{value}</span>
+    </div>
+  );
+}
+
+function PaymentField({ order }) {
+  const { sb } = useMoocha();
+  const [details, setDetails] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!sb || !order.stripeSessionId) { setLoading(false); return; }
+    setLoading(true);
+    setError(null);
+    sb.functions.invoke('get-order-payment', { body: { orderId: order.id } }).then(({ data, error: err }) => {
+      if (cancelled) return;
+      if (err || data?.error) { setError(data?.error || err?.message || 'Could not load Stripe details'); }
+      else setDetails(data);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [sb, order.id, order.stripeSessionId]);
+
+  if (!order.stripeSessionId) {
+    const isRedeemed = (order.items || []).some(it => it.redeemed);
+    const label = isRedeemed
+      ? '🎁 Redeemed with stamps — no payment'
+      : order.orderType === 'walkin'
+        ? 'Cash / no payment record (walk-in)'
+        : 'No payment record';
+    return (
+      <div className="field">
+        <label>Payment</label>
+        <div className="admin-item-name">{label}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="field">
+      <label>Payment</label>
+      <div style={{ background: 'var(--paper)', border: '2px solid var(--line)', borderRadius: 14, padding: '12px 14px' }}>
+        {loading && <div style={{ fontSize: 12.5, color: 'var(--brand)', fontWeight: 700, fontStyle: 'italic' }}>Checking Stripe…</div>}
+        {!loading && error && <div style={{ fontSize: 12.5, color: '#b5563f', fontWeight: 700 }}>⚠️ {error}</div>}
+        {!loading && details && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span className="admin-item-name" style={{ fontSize: 13.5 }}>
+                {details.paymentMethodType ? details.paymentMethodType.toUpperCase() : 'Stripe'}
+              </span>
+              <Badge
+                label={details.paymentStatus}
+                style={details.paymentStatus === 'paid' ? { background: 'var(--green)', color: '#fff' } : { background: 'var(--sun)', color: '#8a5b05' }}
+              />
+            </div>
+            <DetailRow label="Reference" value={details.paynowReference} />
+            <DetailRow label="Email" value={details.customerEmail} />
+            <DetailRow label="Refunded" value={details.refunded ? money((details.amountRefunded || 0) / 100) : null} />
+            <DetailRow label="Net after fees" value={details.netAmount != null ? `${money(details.netAmount / 100)} (fee ${money((details.feeAmount || 0) / 100)})` : null} />
+            {details.disputed && <DetailRow label="⚠️ Disputed" value="Yes" />}
+            <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+              {details.receiptUrl && <a className="edit-link" href={details.receiptUrl} target="_blank" rel="noreferrer">Receipt →</a>}
+              <a className="edit-link" href={stripeDashboardUrl(order.stripeSessionId)} target="_blank" rel="noreferrer">Stripe Dashboard →</a>
+            </div>
+          </>
+        )}
+        <div style={{ fontSize: 10.5, color: 'var(--brand)', fontFamily: 'monospace', wordBreak: 'break-all', marginTop: 8, opacity: 0.8 }}>
+          {order.stripeSessionId}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OrderDetailSheet({ order, onClose }) {
   const { markOrderCollected, deleteOrder, refundOrder, showToast } = useMoocha();
   const [refunding, setRefunding] = React.useState(false);
@@ -64,8 +155,11 @@ export default function OrderDetailSheet({ order, onClose }) {
     onClose();
   };
 
+  const isRedeemed = (order.items || []).some(it => it.redeemed);
   const refund = async () => {
-    const verb = order.stripeSessionId ? `refund ${money(order.total)} via Stripe for` : 'mark refunded (cash)';
+    const verb = order.stripeSessionId
+      ? `refund ${money(order.total)} via Stripe for`
+      : isRedeemed ? 'cancel and give back the stamps used on' : 'mark refunded (cash) for';
     if (!window.confirm(`Really ${verb} order #${order.id}? This can't be undone.`)) return;
     setRefunding(true);
     const { error } = await refundOrder(order);
@@ -79,7 +173,10 @@ export default function OrderDetailSheet({ order, onClose }) {
     <>
       <div className="sheet-close" />
       <div className="sheet-title">Order #{order.id}</div>
-      <div className="sheet-sub">{order.orderType === 'walkin' ? 'Walk-in' : 'Preorder'} · {order.status}</div>
+      <div className="sheet-sub" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span>{order.orderType === 'walkin' ? 'Walk-in' : 'Preorder'}</span>
+        <StatusBadge status={order.status} />
+      </div>
 
       <OrderProgress status={order.status} />
 
@@ -92,21 +189,20 @@ export default function OrderDetailSheet({ order, onClose }) {
 
       <div className="field">
         <label>Collected at</label>
-        <div className="admin-item-name">{order.collectedAt ? new Date(order.collectedAt).toLocaleString() : '— not yet collected —'}</div>
-      </div>
-
-      <div className="field">
-        <label>Payment</label>
-        <div className="admin-item-name" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>
-          {order.stripeSessionId ? `Stripe · ${order.stripeSessionId}` : 'Cash / no payment record (walk-in)'}
+        <div className="admin-item-name">
+          {order.collectedAt ? new Date(order.collectedAt).toLocaleString() : '— not yet collected —'}
+          {order.collectedBy ? ` · ${order.collectedBy}` : ''}
         </div>
       </div>
+
+      <PaymentField order={order} />
 
       {order.status === 'Refunded' && (
         <div className="field">
           <label>Refunded at</label>
           <div className="admin-item-name" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>
             {order.refundedAt ? new Date(order.refundedAt).toLocaleString() : '—'}
+            {order.refundedBy ? ` · ${order.refundedBy}` : ''}
             {order.refundId ? ` · ${order.refundId}` : ''}
           </div>
         </div>
@@ -128,10 +224,15 @@ export default function OrderDetailSheet({ order, onClose }) {
       {order.status === 'Received' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
       {canRefund && (
         <button className="btn-secondary" style={{ marginTop: 8, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>
-          {refunding ? 'Refunding…' : order.stripeSessionId ? 'Refund via Stripe' : 'Mark refunded (cash)'}
+          {refunding ? 'Refunding…' : order.stripeSessionId ? 'Refund via Stripe' : isRedeemed ? 'Cancel & refund stamps' : 'Mark refunded (cash)'}
         </button>
       )}
-      <button className="btn-secondary" style={{ marginTop: canRefund ? 8 : 16, color: '#b5563f', borderColor: '#FFDCD2' }} onClick={remove}>Delete order</button>
+      {/* A small text link, not a full-width button like refund — delete is
+          rare and destructive, and shouldn't share visual weight with the
+          much more common refund action right above it. */}
+      <div style={{ textAlign: 'center', marginTop: 16 }}>
+        <span className="remove-link" onClick={remove}>Delete order</span>
+      </div>
     </>
   );
 }

@@ -99,7 +99,12 @@ Deno.serve(async (req) => {
     // step fails, the order is stuck showing "Received"/"Collected" despite
     // being refunded — surface that distinctly so staff know to fix the DB
     // row by hand rather than assume the refund itself didn't go through.
-    const { error: rpcError } = await supabase.rpc("refund_order", {
+    //
+    // Uses authedClient (the caller's own session), not the service-role
+    // `supabase` client used above — refund_order() stamps refunded_by
+    // with auth.email(), which only resolves to the actual staff member
+    // when the RPC runs under their own JWT rather than the service role.
+    const { error: rpcError } = await authedClient.rpc("refund_order", {
       p_id: orderId,
       p_refund_id: refund.id,
     });

@@ -43,6 +43,12 @@ export function MoochaProvider({ children }) {
   const [cart, setCart] = useState(() => getLocal('moocha_cart', []));
   const [myProfile, setMyProfile] = useState(() => getLocal('moocha_my_profile', null));
   const [myStamps, setMyStamps] = useState(0);
+  // Which cart line (by lineId) has 1 unit marked as the loyalty reward.
+  // Deliberately not persisted to localStorage like the cart itself — if
+  // the page reloads mid-checkout, re-picking a line is a small ask and
+  // safer than trusting a stale selection days later. Not real money is
+  // at stake either way since the server re-verifies eligibility itself.
+  const [redeemedLineId, setRedeemedLineId] = useState(null);
 
   // ---------------- shared/backend-derived state ----------------
   const [menu, setMenu] = useState(DEFAULT_MENU);
@@ -59,6 +65,7 @@ export function MoochaProvider({ children }) {
   // could otherwise call the API directly.
   const [session, setSession] = useState(null);
   const isAdmin = !!session;
+  const staffEmail = session?.user?.email || null;
   const [adminTab, setAdminTab] = useState('sales');
 
   useEffect(() => {
@@ -88,7 +95,11 @@ export function MoochaProvider({ children }) {
     if (!sb) return getLocal('demo_orders', []);
     const { data, error } = await sb.from('orders').select('*').order('date', { ascending: false });
     if (error) { noteSupabaseError('Loading orders', error); return []; }
-    return data.map(r => ({ id: r.id, name: r.name, phone: r.phone, date: r.date, items: r.items, total: Number(r.total), notes: r.notes, status: r.status, orderType: r.order_type, collectedAt: r.collected_at, stripeSessionId: r.stripe_session_id, refundedAt: r.refunded_at, refundId: r.refund_id }));
+    return data.map(r => ({
+      id: r.id, name: r.name, phone: r.phone, date: r.date, items: r.items, total: Number(r.total), notes: r.notes,
+      status: r.status, orderType: r.order_type, collectedAt: r.collected_at, collectedBy: r.collected_by,
+      stripeSessionId: r.stripe_session_id, refundedAt: r.refunded_at, refundedBy: r.refunded_by, refundId: r.refund_id,
+    }));
   }, [noteSupabaseError]);
 
   const fetchSettings = useCallback(async () => {
@@ -280,7 +291,10 @@ export function MoochaProvider({ children }) {
       setOrders(list);
       return;
     }
-    const { error } = await sb.from('orders').delete().eq('id', id);
+    // Goes through delete_order() rather than a plain table delete so the
+    // order gets logged to order_deletions (who deleted it, and a snapshot
+    // of what it was) before the row disappears for good.
+    const { error } = await sb.rpc('delete_order', { p_id: id });
     if (error) noteSupabaseError('Deleting order', error);
     setOrders(await fetchOrders());
   }, [fetchOrders, noteSupabaseError]);
@@ -391,6 +405,23 @@ export function MoochaProvider({ children }) {
   // ---------------- cart helpers ----------------
   const saveCartLocal = useCallback((next) => setLocal('moocha_cart', next), []);
   const cartSubtotal = cart.reduce((s, l) => s + l.lineTotal, 0);
+
+  // Redeeming online (as opposed to in person, where staff can just look at
+  // the customer) needs proof this browser actually owns the phone's
+  // stamps — the same customerToken minted after a first paid order and
+  // otherwise only used to read the (read-only) My Rewards page.
+  const loyaltyRedeemEligible = !!(myProfile?.phone && myProfile?.customerToken && myStamps >= STAMP_GOAL);
+  const redeemedLine = redeemedLineId ? cart.find(l => l.lineId === redeemedLineId) : null;
+  // Only 1 unit of the chosen line is ever free, same as the walk-in flow.
+  const redeemDiscount = redeemedLine ? redeemedLine.lineTotal / redeemedLine.qty : 0;
+  const cartTotalAfterRedeem = Math.max(0, cartSubtotal - redeemDiscount);
+
+  // Clears the selection the moment it stops making sense — the line was
+  // removed/cart cleared, or stamps dropped below goal after a refresh —
+  // rather than leaving a stale "1 free" applied to nothing.
+  useEffect(() => {
+    if (redeemedLineId && (!redeemedLine || !loyaltyRedeemEligible)) setRedeemedLineId(null);
+  }, [redeemedLineId, redeemedLine, loyaltyRedeemEligible]);
 
   // Adding the same item + sugar level combo again merges into the
   // existing line (qty bumped) instead of creating a second, confusing
@@ -515,11 +546,12 @@ export function MoochaProvider({ children }) {
     tab, setTab, activeCat, setActiveCat,
     cart, cartSubtotal, addLineToCart, cartQty, updateLine, removeLine, clearCart,
     myProfile, saveProfile, saveCustomerToken, myStamps, refreshMyLoyalty, fetchMyOrders,
+    redeemedLineId, setRedeemedLineId, loyaltyRedeemEligible, redeemDiscount, cartTotalAfterRedeem,
     // shared state
     menu, setMenu, settings, setSettings, ordersOpen, orders, setOrders, customers, setCustomers,
     lastSupabaseError, setLastSupabaseError,
     // admin
-    isAdmin, adminTab, setAdminTab, logOut, refreshAdminData, signInStaff, changeStaffPassword,
+    isAdmin, staffEmail, adminTab, setAdminTab, logOut, refreshAdminData, signInStaff, changeStaffPassword,
     // toast
     toast, showToast,
     // backend actions
