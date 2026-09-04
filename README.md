@@ -60,11 +60,15 @@ connected — change it from Settings once you're live.
 
 ## 4. Optional: card payments via Stripe
 
-Two Supabase Edge Functions handle this — `create-checkout-session`
+Three Supabase Edge Functions handle this — `create-checkout-session`
 (creates the Stripe Checkout session when a customer taps "Pay with
-PayNow") and `stripe-webhook` (the only place an order actually gets
-written, once Stripe confirms payment). Nothing in the React app needs to
-change for this; `CheckoutSheet` already calls `sb.functions.invoke(...)`.
+PayNow"), `stripe-webhook` (the only place an order actually gets
+written, once Stripe confirms payment), and `refund-order` (the only place
+staff can refund a Stripe-paid order from the admin dashboard's order
+detail view — a cash/walk-in order has no Stripe payment, so refunding one
+of those just updates the database directly). Nothing in the React app
+needs to change for this; `CheckoutSheet`/`OrderDetailSheet` already call
+`sb.functions.invoke(...)`.
 
 1. Install the [Supabase CLI](https://supabase.com/docs/guides/cli) and
    link it to your project:
@@ -80,18 +84,20 @@ change for this; `CheckoutSheet` already calls `sb.functions.invoke(...)`.
    ```
    The service role key (not the anon key) is under Project Settings >
    API — it must only ever live here, never in the React app.
-3. Deploy both functions:
+3. Deploy all three functions:
    ```bash
    supabase functions deploy create-checkout-session
    supabase functions deploy stripe-webhook
+   supabase functions deploy refund-order
    ```
 4. In the Stripe Dashboard, add a webhook endpoint pointing to
    `https://your-project-ref.supabase.co/functions/v1/stripe-webhook`,
    listening for `checkout.session.completed` and
    `checkout.session.expired`.
-5. Redeploy `supabase functions deploy create-checkout-session` any time
-   you change that function's code — pushing to `main`/opening a PR does
-   not deploy it automatically.
+5. Redeploy the relevant function (e.g.
+   `supabase functions deploy create-checkout-session`) any time you
+   change its code — pushing to `main`/opening a PR does not deploy it
+   automatically.
 
 ## 5. Build & deploy
 
