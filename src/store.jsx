@@ -402,6 +402,32 @@ export function MoochaProvider({ children }) {
     });
   }, []);
 
+  // Staff-only: mints a short-lived, single-use code for an existing
+  // (e.g. walk-in-only) customer to link their stamps to the website —
+  // see 20260905100000_customer_claim_link.sql for why this exists.
+  const generateClaimLink = useCallback(async (phone) => {
+    if (!sb) return { error: 'Connect Supabase to use this (see README.md)' };
+    const { data, error } = await sb.rpc('generate_customer_claim', { p_phone: phone });
+    if (error) { noteSupabaseError('Generating claim link', error); return { error: error.message }; }
+    return { code: data };
+  }, [noteSupabaseError]);
+
+  // Redeems a claim code from a customer's own browser (no auth needed —
+  // the code itself, not a phone number, is the proof of ownership) and
+  // saves the resulting profile/token exactly like a first paid order
+  // would have.
+  const claimRewards = useCallback(async (code) => {
+    if (!sb) return { error: "Rewards aren't set up yet — see README.md" };
+    const { data, error } = await sb.rpc('redeem_customer_claim', { p_code: code });
+    if (error) return { error: error.message || 'This link has expired or was already used' };
+    saveProfile({ name: data.name || '', phone: data.phone });
+    saveCustomerToken(data.customerToken);
+    // The RPC already hands back the current stamp count — no need for a
+    // second round-trip through get_my_stamps just to display it.
+    setMyStamps(data.stamps || 0);
+    return { name: data.name, stamps: data.stamps };
+  }, [saveProfile, saveCustomerToken]);
+
   // ---------------- cart helpers ----------------
   const saveCartLocal = useCallback((next) => setLocal('moocha_cart', next), []);
   const cartSubtotal = cart.reduce((s, l) => s + l.lineTotal, 0);
@@ -545,7 +571,7 @@ export function MoochaProvider({ children }) {
     // customer state
     tab, setTab, activeCat, setActiveCat,
     cart, cartSubtotal, addLineToCart, cartQty, updateLine, removeLine, clearCart,
-    myProfile, saveProfile, saveCustomerToken, myStamps, refreshMyLoyalty, fetchMyOrders,
+    myProfile, saveProfile, saveCustomerToken, myStamps, refreshMyLoyalty, fetchMyOrders, claimRewards,
     redeemedLineId, setRedeemedLineId, loyaltyRedeemEligible, redeemDiscount, cartTotalAfterRedeem,
     // shared state
     menu, setMenu, settings, setSettings, ordersOpen, orders, setOrders, customers, setCustomers,
@@ -558,7 +584,7 @@ export function MoochaProvider({ children }) {
     fetchOrders, fetchSettings, fetchMenuData, fetchCustomers,
     menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuSaveItem,
     persistSettings, setCollectionHours, deleteOrder, refundOrder, logWalkinOrder, markOrderCollected,
-    setCustomerStamps, deleteCustomerRecord,
+    setCustomerStamps, deleteCustomerRecord, generateClaimLink,
     noteSupabaseError,
   };
 

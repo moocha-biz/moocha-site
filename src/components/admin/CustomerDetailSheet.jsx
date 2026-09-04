@@ -7,8 +7,23 @@ import StatusBadge from './StatusBadge.jsx';
 const RECENT_ORDERS_SHOWN = 8;
 
 export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
-  const { orders, setCustomerStamps, deleteCustomerRecord, fetchCustomers, setCustomers, showToast } = useMoocha();
+  const { orders, setCustomerStamps, deleteCustomerRecord, fetchCustomers, setCustomers, generateClaimLink, showToast } = useMoocha();
   const [stampInput, setStampInput] = useState(customer.stamps || 0);
+  const [claimLink, setClaimLink] = useState(null);
+  const [generatingClaim, setGeneratingClaim] = useState(false);
+
+  const shareClaimLink = async () => {
+    setGeneratingClaim(true);
+    const { code, error } = await generateClaimLink(customer.phone);
+    setGeneratingClaim(false);
+    if (error) { showToast(error); return; }
+    setClaimLink(`${window.location.origin}/rewards?claim=${code}`);
+  };
+
+  const copyClaimLink = async () => {
+    try { await navigator.clipboard.writeText(claimLink); showToast('Link copied ✓'); }
+    catch { showToast('Could not copy — select and copy it manually'); }
+  };
 
   // `orders` is already fetched newest-first, so slicing here is enough —
   // no need to re-sort per customer.
@@ -44,6 +59,29 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
       <div style={{ marginBottom: 18 }}>
         <StampCard stamps={customer.stamps || 0} flipEnabled={false} rewardMessage="🎉 free drink ready to redeem" />
       </div>
+
+      <div className="field">
+        <label>Link their stamps to the website</label>
+        <div className="sub" style={{ color: 'var(--brand)', marginBottom: 8 }}>
+          For a customer who's only ever ordered in person — this generates a one-time link (valid 15 minutes) that
+          opens their My Rewards page on their own phone. Send it however's easiest while they're with you.
+        </div>
+        {!claimLink && (
+          <button className="btn-secondary" style={{ marginBottom: 0 }} disabled={generatingClaim} onClick={shareClaimLink}>
+            {generatingClaim ? 'Generating…' : 'Generate rewards link'}
+          </button>
+        )}
+        {claimLink && (
+          <>
+            <input readOnly value={claimLink} onFocus={e => e.target.select()} style={{ fontSize: 12, wordBreak: 'break-all' }} />
+            <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+              <span className="edit-link" onClick={copyClaimLink}>Copy link</span>
+              <span className="edit-link" onClick={shareClaimLink}>Generate new one</span>
+            </div>
+          </>
+        )}
+      </div>
+
       <div className="field">
         <label>Set exact stamp count (goal: {STAMP_GOAL})</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
