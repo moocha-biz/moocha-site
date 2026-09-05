@@ -54,11 +54,8 @@ export default function MenuView({ onOpenItem }) {
         {items.map(item => {
           const preorderSoldOut = isPreorderSoldOut(item);
           const unavailable = item.soldout || preorderSoldOut;
-          const remaining = preorderRemaining(item);
-          const lowStock = !unavailable && remaining != null && remaining < 5;
           const statusLabel = item.soldout ? 'sold out today'
-            : preorderSoldOut ? 'preorder sold out'
-              : lowStock ? `🔥 only ${remaining} left!` : null;
+            : preorderSoldOut ? 'preorder sold out' : null;
           return (
             <div
               key={item.id}
@@ -68,9 +65,10 @@ export default function MenuView({ onOpenItem }) {
               <div className="item-row-thumb"><ItemThumb item={item} /></div>
               <div className="item-row-info">
                 <div className="item-row-name">{item.name}</div>
+                {item.desc && <div className="item-row-desc">{item.desc}</div>}
                 <div className="item-row-bottom">
                   <div className="item-price">{money(item.price)}</div>
-                  {statusLabel && <div className={unavailable ? 'soldout-tag' : 'low-stock-tag'}>{statusLabel}</div>}
+                  {statusLabel && <div className="soldout-tag">{statusLabel}</div>}
                 </div>
               </div>
             </div>
