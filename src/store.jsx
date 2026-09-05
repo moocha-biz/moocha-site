@@ -464,6 +464,21 @@ export function MoochaProvider({ children }) {
     }
   }, [redeemedLineId, redeemedLine, loyaltyRedeemEligible, showToast]);
 
+  // The moment an eligible customer's cart renders, auto-apply the reward to
+  // their priciest line (biggest saving) instead of showing the full price
+  // and waiting for them to notice/tap "make 1 free" themselves — otherwise
+  // the line/Total/Checkout all briefly show the pre-reward price even
+  // though the banner already promised a free drink. Runs once per session:
+  // the ref stops it from re-firing and overriding a deliberate deselect.
+  const autoRedeemAppliedRef = useRef(false);
+  useEffect(() => {
+    if (autoRedeemAppliedRef.current) return;
+    if (!loyaltyRedeemEligible || cart.length === 0) return;
+    const priciest = cart.reduce((a, b) => (b.lineTotal / b.qty) > (a.lineTotal / a.qty) ? b : a);
+    autoRedeemAppliedRef.current = true;
+    setRedeemedLineId(priciest.lineId);
+  }, [loyaltyRedeemEligible, cart, setRedeemedLineId]);
+
   // Adding the same item + sugar level combo again merges into the
   // existing line (qty bumped) instead of creating a second, confusing
   // duplicate line for the same drink.
