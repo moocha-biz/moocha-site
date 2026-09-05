@@ -71,8 +71,8 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .closed-banner div.sub{ font-size:13px; color:#8a5646; font-weight:600;}
 
 .tabbar{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:460px; background:var(--cream2); border-top:2px solid var(--mint); display:flex; justify-content:space-around; padding:10px 8px 16px 8px; z-index:30;}
-.tabitem{ display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; color:#a9bfa2; cursor:pointer; font-family:'Baloo 2'; font-size:11px; font-weight:700; padding:4px 12px; position:relative;}
-.tabitem.active{ color:var(--green-dark); transform: translateY(-2px);}
+.tabitem{ display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; border-radius:16px; color:#a9bfa2; cursor:pointer; font-family:'Baloo 2'; font-size:11px; font-weight:700; padding:6px 16px; position:relative;}
+.tabitem.active{ color:var(--green-dark); background:var(--mint); transform: translateY(-2px);}
 .cart-badge{ position:absolute; top:-3px; right:4px; background:var(--sun-deep); color:#fff; font-size:9.5px; font-weight:800; width:16px;height:16px;border-radius:50%; display:flex;align-items:center;justify-content:center;}
 
 .overlay{ position:fixed; inset:0; background:rgba(47,82,51,0.45); display:none; align-items:flex-end; justify-content:center; z-index:100;}
