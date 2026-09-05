@@ -450,10 +450,19 @@ export function MoochaProvider({ children }) {
 
   // Clears the selection the moment it stops making sense — the line was
   // removed/cart cleared, or stamps dropped below goal after a refresh —
-  // rather than leaving a stale "1 free" applied to nothing.
+  // rather than leaving a stale "1 free" applied to nothing. Only the
+  // eligibility-loss case gets a toast: the line-removed case is something
+  // the customer just did themselves (obvious why it's gone), but losing
+  // eligibility happens invisibly in the background and would otherwise
+  // look like the app silently dropped their reward.
   useEffect(() => {
-    if (redeemedLineId && (!redeemedLine || !loyaltyRedeemEligible)) setRedeemedLineId(null);
-  }, [redeemedLineId, redeemedLine, loyaltyRedeemEligible]);
+    if (!redeemedLineId) return;
+    if (!redeemedLine) { setRedeemedLineId(null); return; }
+    if (!loyaltyRedeemEligible) {
+      setRedeemedLineId(null);
+      showToast("Your free drink selection was cleared — you're not eligible right now");
+    }
+  }, [redeemedLineId, redeemedLine, loyaltyRedeemEligible, showToast]);
 
   // Adding the same item + sugar level combo again merges into the
   // existing line (qty bumped) instead of creating a second, confusing

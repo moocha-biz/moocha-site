@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMoocha } from '../store.jsx';
 import { money } from '../lib/storage.js';
+import { normalizeSgPhone } from '../lib/phone.js';
 import { fireConfetti } from './Confetti.jsx';
 
 export default function CheckoutSheet({ onClose }) {
@@ -49,9 +50,16 @@ export default function CheckoutSheet({ onClose }) {
 
   const startPayNowCheckout = async () => {
     if (!name.trim() || !phone.trim()) { showToast('Fill in your name and phone number 🙏'); return; }
+    // Catches a typo before it becomes an order that's unrecoverable from
+    // My Rewards — an unnormalized/malformed phone here would silently
+    // fragment this customer's stamp card into two different records
+    // (spaces/dashes aside, get_my_orders/get_my_stamps match phone
+    // exactly), not just fail loudly.
+    const normalizedPhone = normalizeSgPhone(phone);
+    if (!normalizedPhone) { showToast("That doesn't look like a valid mobile number — check and try again"); return; }
     if (!sb) { showToast("PayNow isn't set up yet — see README.md"); return; }
     setBusy(true);
-    const profile = { name: name.trim(), phone: phone.trim(), email: email.trim() };
+    const profile = { name: name.trim(), phone: normalizedPhone, email: email.trim() };
     saveProfile(profile);
 
     if (isFreeOrder) {
