@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useMoocha } from './store.jsx';
 import CustomerApp from './components/CustomerApp.jsx';

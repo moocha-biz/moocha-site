@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { STAMP_GOAL } from '../store.jsx';
 
 const SCALLOP_PATH = `M0.03,0.08

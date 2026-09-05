@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useMoocha } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
 import Chart from 'chart.js/auto';

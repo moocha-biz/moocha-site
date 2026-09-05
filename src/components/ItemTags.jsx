@@ -1,5 +1,3 @@
-import React from 'react';
-
 // Auto-picks readable text color for whatever background an admin picks,
 // so a custom tag never ends up as light text on a light color (or the
 // reverse).

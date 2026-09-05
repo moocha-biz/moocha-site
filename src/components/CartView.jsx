@@ -1,4 +1,3 @@
-import React from 'react';
 import { useMoocha } from '../store.jsx';
 import { money } from '../lib/storage.js';
 

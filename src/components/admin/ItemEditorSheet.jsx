@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useMoocha, DEFAULT_SUGAR_LEVELS } from '../../store.jsx';
 import ItemTags from '../ItemTags.jsx';
 

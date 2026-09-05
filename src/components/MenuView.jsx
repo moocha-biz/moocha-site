@@ -1,4 +1,3 @@
-import React from 'react';
 import { useMoocha } from '../store.jsx';
 import ItemThumb from './ItemThumb.jsx';
 import ItemTags from './ItemTags.jsx';
