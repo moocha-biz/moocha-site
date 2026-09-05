@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useMoocha } from '../store.jsx';
 import { money } from '../lib/storage.js';
 import { normalizeSgPhone } from '../lib/phone.js';
+import { formatCollectionWindow } from '../lib/pickup.js';
 import { fireConfetti } from './Confetti.jsx';
 
 export default function CheckoutSheet({ onClose }) {
   const {
-    sb, myProfile, saveProfile, cart, showToast,
+    sb, myProfile, saveProfile, cart, showToast, settings,
     redeemedLineId, cartTotalAfterRedeem, clearCart, refreshMyLoyalty, setTab,
   } = useMoocha();
+  const collectionWindow = formatCollectionWindow(settings.collectionStart, settings.collectionEnd);
   const [name, setName] = useState(myProfile?.name || '');
   const [phone, setPhone] = useState(myProfile?.phone || '');
   const [email, setEmail] = useState(myProfile?.email || '');
@@ -111,12 +113,20 @@ export default function CheckoutSheet({ onClose }) {
       <>
         <div className="sheet-close" />
         <div className="sheet-title" style={{ textAlign: 'center' }}>Free drink redeemed! 🎉</div>
-        <div className="sheet-sub" style={{ textAlign: 'center' }}>Show this at pickup — no payment needed.</div>
+        <div className="order-confirm-id">Order #{redeemedOrder.id}</div>
+        <div className="sheet-sub" style={{ textAlign: 'center' }}>No payment needed — quote order #{redeemedOrder.id} or your name/phone at pickup.</div>
+        {collectionWindow && (
+          <div className="closed-banner" style={{ padding: '12px 14px', marginBottom: 14, background: 'var(--mint)' }}>
+            <div className="heading" style={{ fontSize: 14, color: 'var(--green-dark)' }}>🕐 ready for pickup:</div>
+            <div className="sub" style={{ color: 'var(--green-dark)' }}>{collectionWindow}</div>
+          </div>
+        )}
         {(redeemedOrder.items || []).map((it, i) => (
           <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}{it.redeemed ? ' · 🎁 free' : ''}</span><span>{money(it.lineTotal)}</span></div>
         ))}
         <div className="summary-row total"><span>Total</span><span>{money(0)}</span></div>
-        <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => { onClose(); setTab('loyalty'); }}><span>See you soon!</span></button>
+        <div className="sheet-sub" style={{ textAlign: 'center', marginTop: 10 }}>See you soon! 👋</div>
+        <button className="btn-primary" style={{ marginTop: 6 }} onClick={() => { onClose(); setTab('loyalty'); }}><span>Done</span></button>
       </>
     );
   }

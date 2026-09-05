@@ -104,6 +104,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .sheet-close{ width:40px;height:6px;background:var(--mint-deep); border-radius:999px; margin:0 auto 14px auto;}
 .sheet-title{ font-family:'Baloo 2'; font-size:23px; font-weight:800; margin-bottom:2px; color:var(--green-dark);}
 .sheet-sub{ font-size:13px; color:var(--brand); font-weight:600; margin-bottom:16px;}
+.order-confirm-id{ text-align:center; font-family:'Baloo 2'; font-weight:800; font-size:15px; color:var(--green-dark); background:var(--mint); border-radius:999px; padding:6px 16px; display:table; margin:0 auto 12px auto; letter-spacing:0.02em;}
 
 .opt-group{ margin-bottom:18px;}
 .opt-label{ font-family:'Baloo 2'; font-weight:700; font-size:14px; display:flex; align-items:baseline; gap:8px; margin-bottom:8px; color:var(--green-dark);}
