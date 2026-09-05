@@ -32,8 +32,8 @@ export default function MenuView({ onOpenItem }) {
   const collectionWindow = formatCollectionWindow(settings.collectionStart, settings.collectionEnd);
   const collectionNotice = collectionWindow && (
     <div className="closed-banner" style={{ padding: '14px 16px', marginBottom: 14, background: 'var(--mint)' }}>
-      <div className="heading" style={{ fontSize: 15, color: 'var(--green-dark)' }}>🕐 opening hours:</div>
-      <div className="sub" style={{ color: 'var(--green-dark)' }}>{collectionWindow}</div>
+      <div className="heading" style={{ fontSize: 15, color: 'var(--green-dark)' }}>🕐 pickup window:</div>
+      <div className="sub" style={{ color: 'var(--green-dark)' }}>orders placed now are ready for collection {collectionWindow}</div>
     </div>
   );
 
