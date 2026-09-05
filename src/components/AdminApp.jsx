@@ -22,7 +22,7 @@ export default function AdminApp() {
         <div className="heading">🐮 moocha staff</div>
         <div className="admin-header-btns">
           <button className="admin-back" onClick={() => refreshAdminData().then(() => setAdminTab(adminTab))}>↻ Refresh</button>
-          <button className="admin-back" onClick={logOut}>Log out</button>
+          <button className="admin-logout" onClick={logOut}>Log out</button>
         </div>
       </div>
       <div className="admin-tabs">
