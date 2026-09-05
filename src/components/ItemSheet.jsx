@@ -74,6 +74,7 @@ export default function ItemSheet({ item, editLine, onClose }) {
           </div>
         </div>
       )}
+      <div className="qty-label">Quantity</div>
       <div className="qty-row">
         <button className="qty-btn" onClick={() => changeQty(-1)}>−</button>
         <div className="qty-num">{sel.qty}</div>

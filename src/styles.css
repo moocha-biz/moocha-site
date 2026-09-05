@@ -56,7 +56,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .item-price{ font-family:'Baloo 2'; font-weight:700; font-size:15px; color:var(--green); margin-top:8px;}
 .soldout-tag{ font-size:10.5px; font-weight:800; color:#b5563f; background:var(--blush); padding:3px 10px; border-radius:999px; display:inline-block; margin-top:6px;}
 .item-card.soldout{ opacity:0.5; cursor:default;}
-.low-stock-tag{ font-size:10.5px; font-weight:800; color:#8a5b05; background:var(--sun); padding:3px 10px; border-radius:999px; display:inline-block; margin-top:6px; animation: nudge 1.4s ease-in-out infinite;}
+.low-stock-tag{ font-size:10.5px; font-weight:800; color:#8a5b05; background:var(--sun); padding:3px 10px; border-radius:999px; display:inline-block; align-self:flex-start; margin-top:6px; animation: nudge 1.4s ease-in-out infinite;}
 @keyframes nudge{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.07);} }
 .custom-tag{ font-size:10.5px; font-weight:800; padding:3px 10px; border-radius:999px; display:inline-block; margin-top:6px; margin-right:6px;}
 .item-name-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
@@ -104,7 +104,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .sheet-sub{ font-size:13px; color:var(--brand); font-weight:600; margin-bottom:16px;}
 
 .opt-group{ margin-bottom:18px;}
-.opt-label{ font-family:'Baloo 2'; font-weight:700; font-size:14px; display:flex; justify-content:space-between; margin-bottom:8px; color:var(--green-dark);}
+.opt-label{ font-family:'Baloo 2'; font-weight:700; font-size:14px; display:flex; align-items:baseline; gap:8px; margin-bottom:8px; color:var(--green-dark);}
 .opt-required{ font-size:9.5px; font-weight:800; color:var(--sun-deep); text-transform:uppercase; letter-spacing:0.04em;}
 .opt-row{ display:flex; flex-wrap:wrap; gap:8px;}
 .opt-chip{ border:2px solid var(--line); background:var(--paper); color:var(--green-dark); padding:8px 15px; border-radius:14px; font-size:13.5px; font-weight:700; cursor:pointer; font-family:'Nunito';}
@@ -116,6 +116,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .addon-check{ width:24px;height:24px;border-radius:8px;border:2px solid var(--mint-deep); display:flex;align-items:center;justify-content:center; cursor:pointer; flex-shrink:0; font-weight:800;}
 .addon-check.checked{ background:var(--green); border-color:var(--green); color:#fff;}
 
+.qty-label{ font-family:'Baloo 2'; font-weight:700; font-size:14px; text-align:center; color:var(--green-dark); margin-bottom:8px;}
 .qty-row{ display:flex; align-items:center; gap:16px; justify-content:center; margin:10px 0 18px 0;}
 .qty-btn{ width:38px;height:38px;border-radius:50%; border:none; background:var(--mint); color:var(--green-dark); font-size:19px; font-weight:800; cursor:pointer; box-shadow:0 3px 0 var(--mint-deep);}
 .qty-btn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--mint-deep);}
