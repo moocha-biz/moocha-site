@@ -81,11 +81,11 @@ export default function CustomerApp() {
         </div>
       </aside>
 
-      <Overlay show={!!openItem} onClose={() => setOpenItemId(null)} floatClose>
+      <Overlay show={!!openItem} onClose={() => setOpenItemId(null)} floatClose fullOnMobile>
         {openItem && <ItemSheet item={openItem} onClose={() => setOpenItemId(null)} />}
       </Overlay>
 
-      <Overlay show={!!editItem} onClose={() => setEditLine(null)} floatClose>
+      <Overlay show={!!editItem} onClose={() => setEditLine(null)} floatClose fullOnMobile>
         {editItem && <ItemSheet item={editItem} editLine={editLine} onClose={() => setEditLine(null)} />}
       </Overlay>
 
