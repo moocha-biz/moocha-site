@@ -27,7 +27,12 @@ export default function App() {
     if (params.get('stripe_success')) {
       clearCart();
       window.history.replaceState({}, '', window.location.pathname);
-      refreshMyLoyalty().then(() => setTab('loyalty'));
+      // Switched synchronously (not gated on refreshMyLoyalty resolving) so
+      // the page behind the confirmation overlay is never the just-cleared,
+      // now-empty cart — that reads as "your order failed" right next to a
+      // modal saying it succeeded.
+      setTab('loyalty');
+      refreshMyLoyalty();
       fireConfetti();
       setPaymentResult({ type: 'success', orderId: params.get('order_id'), sessionId: params.get('session_id') });
     } else if (params.get('stripe_canceled')) {

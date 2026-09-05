@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMoocha } from '../store.jsx';
 import { money } from '../lib/storage.js';
+import { formatCollectionWindow } from '../lib/pickup.js';
 
 // The order row is written by the stripe-webhook function, which can lag a
 // beat behind the browser's redirect back from Stripe — so we poll briefly
@@ -9,9 +10,10 @@ const POLL_ATTEMPTS = 8;
 const POLL_INTERVAL_MS = 1200;
 
 export default function PaymentResultModal({ result, onClose, onRetry }) {
-  const { sb, saveCustomerToken } = useMoocha();
+  const { sb, saveCustomerToken, settings } = useMoocha();
   const [order, setOrder] = useState(null);
   const [gaveUp, setGaveUp] = useState(false);
+  const collectionWindow = formatCollectionWindow(settings.collectionStart, settings.collectionEnd);
 
   useEffect(() => {
     setOrder(null);
@@ -69,14 +71,23 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
       )}
       {order && (
         <>
+          <div className="order-confirm-id">Order #{order.id}</div>
           <div className="sheet-sub" style={{ textAlign: 'center' }}>Your loyalty stamp will be given when you collect this order.</div>
+          {collectionWindow && (
+            <div className="closed-banner" style={{ padding: '12px 14px', marginBottom: 14, background: 'var(--mint)' }}>
+              <div className="heading" style={{ fontSize: 14, color: 'var(--green-dark)' }}>🕐 ready for pickup:</div>
+              <div className="sub" style={{ color: 'var(--green-dark)' }}>{collectionWindow}</div>
+            </div>
+          )}
           {(order.items || []).map((it, i) => (
             <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}</span><span>{money(it.lineTotal)}</span></div>
           ))}
           <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
+          <div className="sheet-sub" style={{ textAlign: 'center', marginTop: 10 }}>Quote order #{order.id} at pickup, or find it later under My Rewards.</div>
         </>
       )}
-      <button className="btn-primary" onClick={onClose}><span>See you soon!</span></button>
+      <div className="sheet-sub" style={{ textAlign: 'center', marginTop: 4 }}>See you soon! 👋</div>
+      <button className="btn-primary" onClick={onClose}><span>Done</span></button>
     </>
   );
 }

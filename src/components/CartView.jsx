@@ -23,7 +23,9 @@ export default function CartView({ onCheckout, onEditLine, compact = false }) {
     <>
       {loyaltyRedeemEligible && (
         <div className="section-note" style={{ color: 'var(--green-dark)', fontWeight: 800, marginBottom: 4 }}>
-          🎁 You have a free drink ready — tap "make 1 free" on a line below.
+          {redeemedLineId
+            ? '🎁 Your free drink is already applied below — tap another line\'s pill to switch it.'
+            : '🎁 You have a free drink ready — tap "make 1 free" on a line below.'}
         </div>
       )}
       {cart.map(l => {
@@ -39,9 +41,13 @@ export default function CartView({ onCheckout, onEditLine, compact = false }) {
                 <span>{l.qty}</span>
                 <button className="mini-btn" onClick={() => cartQty(l.lineId, 1)}>+</button>
               </div>
-              <div style={{ display: 'flex', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 {onEditLine && <span className="edit-link" onClick={() => onEditLine(l)}>Edit</span>}
-                {loyaltyRedeemEligible && <span className="edit-link" onClick={() => toggleRedeem(l.lineId)}>{isRedeemed ? '1 free ✓' : 'make 1 free'}</span>}
+                {loyaltyRedeemEligible && (
+                  <span className={`redeem-pill ${isRedeemed ? 'redeemed' : ''}`} onClick={() => toggleRedeem(l.lineId)}>
+                    {isRedeemed ? '🎁 1 free ✓' : '🎁 make 1 free'}
+                  </span>
+                )}
                 <span className="remove-link" onClick={() => removeLine(l.lineId)}>Remove</span>
               </div>
             </div>

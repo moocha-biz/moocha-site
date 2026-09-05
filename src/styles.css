@@ -29,7 +29,7 @@ header{ padding:22px 20px 8px 20px; display:flex; align-items:center; justify-co
 .brand{ display:flex; align-items:center; gap:12px; }
 .header-logo{ height:44px; width:auto; display:block; margin-left:-2px;}
 .brand-name{ font-family:'Baloo 2'; font-weight:800; font-size:26px; color:var(--green-dark); line-height:1;}
-.brand-sub{ font-size:12px; color:var(--brand); font-weight:700; margin-top:2px;}
+.brand-sub{ font-size:11px; color:var(--brand); font-weight:500; opacity:0.75; margin-top:2px;}
 
 .desktop-nav{ display:none; }
 
@@ -104,6 +104,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .sheet-close{ width:40px;height:6px;background:var(--mint-deep); border-radius:999px; margin:0 auto 14px auto;}
 .sheet-title{ font-family:'Baloo 2'; font-size:23px; font-weight:800; margin-bottom:2px; color:var(--green-dark);}
 .sheet-sub{ font-size:13px; color:var(--brand); font-weight:600; margin-bottom:16px;}
+.order-confirm-id{ text-align:center; font-family:'Baloo 2'; font-weight:800; font-size:15px; color:var(--green-dark); background:var(--mint); border-radius:999px; padding:6px 16px; display:table; margin:0 auto 12px auto; letter-spacing:0.02em;}
 
 .opt-group{ margin-bottom:18px;}
 .opt-label{ font-family:'Baloo 2'; font-weight:700; font-size:14px; display:flex; align-items:baseline; gap:8px; margin-bottom:8px; color:var(--green-dark);}
@@ -138,6 +139,8 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .mini-btn{ width:28px;height:28px;border-radius:9px;border:none; background:var(--mint); cursor:pointer; font-weight:800; color:var(--green-dark);}
 .remove-link{ font-size:11.5px; color:var(--blush-deep); font-weight:700; cursor:pointer;}
 .edit-link{ font-size:11.5px; color:var(--green-dark); font-weight:700; cursor:pointer;}
+.redeem-pill{ font-size:11px; font-weight:800; color:#6b4c05; background:var(--sun); padding:4px 12px; border-radius:999px; cursor:pointer; font-family:'Baloo 2'; white-space:nowrap;}
+.redeem-pill.redeemed{ background:var(--sun-deep); color:#4a3400;}
 
 .summary-row{ display:flex; justify-content:space-between; font-size:13.5px; padding:6px 0; color:#5b6e54; font-weight:700;}
 .summary-row.total{ font-family:'Baloo 2'; font-weight:800; font-size:17px; color:var(--green-dark); border-top:2px dashed var(--line); margin-top:6px; padding-top:12px;}
@@ -186,6 +189,8 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .order-row-right{ text-align:right;}
 .order-row-right .oprice{ font-family:'Baloo 2'; font-weight:800; font-size:14px; color:var(--green-dark);}
 .order-status{ font-size:9.5px; font-weight:800; padding:2px 9px; border-radius:999px; background:var(--mint); color:var(--green-dark); text-transform:uppercase; margin-top:4px; display:inline-block;}
+.order-status.status-refunded{ background:var(--blush); color:#8a3a2a;}
+.order-status.status-failed{ background:#e8e8e8; color:#6b6b6b;}
 
 .qr-box{ background:#fff; padding:18px; border-radius:20px; display:flex; justify-content:center; margin:6px 0 14px 0; box-shadow: var(--shadow);}
 .pay-amount{ text-align:center; font-family:'Baloo 2'; font-size:30px; font-weight:800; color:var(--green-dark); margin-bottom:2px;}
