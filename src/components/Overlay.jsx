@@ -1,11 +1,11 @@
-export default function Overlay({ show, onClose, center = false, cardModal = false, floatClose = false, children }) {
+export default function Overlay({ show, onClose, center = false, cardModal = false, floatClose = false, fullOnMobile = false, children }) {
   return (
     <div
       className={`overlay ${show ? 'show' : ''} ${center ? 'center' : ''}`}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="sheet-wrap">
-        <div className={`sheet ${cardModal ? 'card-modal' : ''}`}>
+        <div className={`sheet ${cardModal ? 'card-modal' : ''} ${fullOnMobile ? 'full-mobile' : ''}`}>
           {show && children}
         </div>
         {/* Lives outside the sheet's own scrolling div, so unlike a button

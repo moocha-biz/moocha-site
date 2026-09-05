@@ -1,6 +1,5 @@
 import { useMoocha } from '../store.jsx';
 import ItemThumb from './ItemThumb.jsx';
-import ItemTags from './ItemTags.jsx';
 import { money } from '../lib/storage.js';
 
 function formatCollectionWindow(start, end) {
@@ -32,8 +31,8 @@ export default function MenuView({ onOpenItem }) {
   const collectionWindow = formatCollectionWindow(settings.collectionStart, settings.collectionEnd);
   const collectionNotice = collectionWindow && (
     <div className="closed-banner" style={{ padding: '14px 16px', marginBottom: 14, background: 'var(--mint)' }}>
-      <div className="heading" style={{ fontSize: 15, color: 'var(--green-dark)' }}>🕐 opening hours:</div>
-      <div className="sub" style={{ color: 'var(--green-dark)' }}>{collectionWindow}</div>
+      <div className="heading" style={{ fontSize: 15, color: 'var(--green-dark)' }}>🕐 pickup window:</div>
+      <div className="sub" style={{ color: 'var(--green-dark)' }}>orders placed now are ready for collection {collectionWindow}</div>
     </div>
   );
 
@@ -51,29 +50,28 @@ export default function MenuView({ onOpenItem }) {
     <>
       {closedNotice}
       {collectionNotice}
-      <div className="menu-grid">
+      <div className="menu-list">
         {items.map(item => {
           const preorderSoldOut = isPreorderSoldOut(item);
           const unavailable = item.soldout || preorderSoldOut;
           const remaining = preorderRemaining(item);
           const lowStock = !unavailable && remaining != null && remaining < 5;
+          const statusLabel = item.soldout ? 'sold out today'
+            : preorderSoldOut ? 'preorder sold out'
+              : lowStock ? `🔥 only ${remaining} left!` : null;
           return (
             <div
               key={item.id}
-              className={`item-card ${unavailable ? 'soldout' : ''}`}
+              className={`item-row ${unavailable ? 'soldout' : ''}`}
               onClick={() => !unavailable && onOpenItem(item.id)}
             >
-              <ItemThumb item={item} />
-              <div className="item-info">
-                <div className="item-name-row">
-                  <div className="item-name">{item.name}</div>
-                  <div className="item-name-tags"><ItemTags tags={item.customTags} /></div>
+              <div className="item-row-thumb"><ItemThumb item={item} /></div>
+              <div className="item-row-info">
+                <div className="item-row-name">{item.name}</div>
+                <div className="item-row-bottom">
+                  <div className="item-price">{money(item.price)}</div>
+                  {statusLabel && <div className={unavailable ? 'soldout-tag' : 'low-stock-tag'}>{statusLabel}</div>}
                 </div>
-                <div className="item-desc">{item.desc}</div>
-                <div className="item-price">{money(item.price)}</div>
-                {item.soldout && <div className="soldout-tag">sold out today</div>}
-                {!item.soldout && preorderSoldOut && <div className="soldout-tag">preorder sold out</div>}
-                {lowStock && <div className="low-stock-tag">🔥 only {remaining} left!</div>}
               </div>
             </div>
           );
