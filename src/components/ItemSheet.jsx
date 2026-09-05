@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useMoocha } from '../store.jsx';
 import { DEFAULT_SUGAR_LEVELS } from '../data/defaults.js';
 import { money } from '../lib/storage.js';

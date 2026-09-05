@@ -1,4 +1,3 @@
-import React from 'react';
 import { useMoocha } from '../store.jsx';
 import SalesTab from './admin/SalesTab.jsx';
 import OrdersTab from './admin/OrdersTab.jsx';

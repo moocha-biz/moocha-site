@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function Overlay({ show, onClose, center = false, cardModal = false, floatClose = false, children }) {
   return (
     <div

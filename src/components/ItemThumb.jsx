@@ -1,5 +1,3 @@
-import React from 'react';
-
 function DoodleIcon() {
   return (
     <svg viewBox="0 0 64 64" width="34" height="34" fill="none">

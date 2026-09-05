@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMoocha } from '../store.jsx';
 import { money } from '../lib/storage.js';
 

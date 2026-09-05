@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useMoocha, STAMP_GOAL } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
 import StampCard from '../StampCard.jsx';
