@@ -153,6 +153,12 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .search-row .search-input{ flex:1; margin-bottom:0;}
 .btn-compact{ width:auto; padding:8px 16px; margin:0;}
 .field input:focus, .field textarea:focus{ outline:none; border-color:var(--green);}
+.field-input-wrap{ position:relative;}
+.field-toggle-icon{ position:absolute; right:6px; top:50%; transform:translateY(-50%); width:32px; height:32px; border:none; background:none; color:var(--brand); cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:9px;}
+.field-toggle-icon:hover{ color:var(--green-dark); background:var(--mint);}
+.field.error input{ border-color:var(--blush-deep); background:#FFF7F5;}
+.field.error input:focus{ border-color:var(--blush-deep);}
+.field-error-msg{ font-size:12px; font-weight:700; color:#b5563f; margin-top:6px;}
 
 .empty-state{ text-align:center; padding:40px 20px; color:var(--brand);}
 .empty-state .heading{ font-size:19px; color:var(--green-dark); margin-bottom:6px;}
