@@ -81,9 +81,14 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .overlay.show{ display:flex; }
 .overlay.center{ align-items:center; }
 .sheet-wrap{ position:relative; width:100%; max-width:460px; min-width:0; }
-.sheet{ background:var(--cream2); width:100%; max-width:460px; border-radius:32px 32px 0 0; max-height:88vh; overflow-y:auto; overflow-x:hidden; padding:20px 20px 30px 20px; animation: sheetup .22s ease; scrollbar-width:none;}
+/* max-height uses vh as a fallback, then dvh (dynamic viewport height) —
+   plain vh on mobile Safari sizes against the layout viewport, which can be
+   taller than what's actually visible while the address bar is showing,
+   letting a bottom sheet's own bottom (its Done/primary button) render
+   below the fold. dvh tracks the real visible viewport instead. */
+.sheet{ background:var(--cream2); width:100%; max-width:460px; border-radius:32px 32px 0 0; max-height:88vh; max-height:88dvh; overflow-y:auto; overflow-x:hidden; padding:20px 20px 30px 20px; animation: sheetup .22s ease; scrollbar-width:none;}
 .sheet::-webkit-scrollbar{ display:none;}
-.sheet.card-modal{ border-radius:28px; margin:0 20px; max-height:82vh;}
+.sheet.card-modal{ border-radius:28px; margin:0 20px; max-height:82vh; max-height:82dvh;}
 /* ItemSheet on a phone: a content-sized bottom sheet left it looking like
    it only covered half the screen whenever the drink had few options
    (nothing to fill the space below "Add to cart"). Below the tablet
@@ -169,11 +174,28 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 
 /* Only one face is ever mounted at a time (see StampCard.jsx) — a 3D
    rotateY + backface-visibility flip reliably rendered both faces mirrored
-   on top of each other on real phones, so the "flip" here is just a
-   horizontal squish-and-swap instead, which has nothing 3D for a mobile
-   browser to get wrong. */
-.stamp-card-flip{ position:relative; width:100%; aspect-ratio:1531/1080; cursor:pointer; transition:transform .15s ease; }
-.stamp-card-flip.squished{ transform:scaleX(0.05); }
+   on top of each other on real phones, so the "flip" here is a horizontal
+   squish-and-swap instead, which has nothing 3D for a mobile browser to get
+   wrong. The keyframes fake a coin-flip: squish down with a slight vertical
+   dip (that's the "edge-on" moment — the new face swaps in right at the
+   narrowest point, a 4%-wide sliver just enough to hide the swap without
+   reading as a freeze), then pop back out with a small overshoot so it
+   settles like a card dropping into place rather than snapping back to size.
+   will-change hints the browser to put this on its own compositor layer,
+   since a plain transform animation can still stutter on an under-powered
+   phone otherwise.
+   The animation is retriggered by adding/removing the class (see
+   StampCard.jsx) rather than by a plain transition, since a transition
+   can't express the overshoot/settle in one continuous curve. */
+.stamp-card-flip{ position:relative; width:100%; aspect-ratio:1531/1080; cursor:pointer; }
+.stamp-card-flip.flipping{ animation:stamp-card-flip-swap .46s cubic-bezier(.4,0,.2,1); will-change:transform; }
+@keyframes stamp-card-flip-swap{
+  0%{ transform:scaleX(1) scaleY(1); }
+  48%{ transform:scaleX(0.02) scaleY(0.9); }
+  52%{ transform:scaleX(0.02) scaleY(0.9); }
+  78%{ transform:scaleX(1.05) scaleY(1.02); }
+  100%{ transform:scaleX(1) scaleY(1); }
+}
 .stamp-card-flip:focus-visible{ outline:3px solid var(--green); outline-offset:3px; border-radius:28px; }
 .stamp-card-static{ position:relative; width:100%; aspect-ratio:1531/1080; }
 .stamp-card-face-inner{ position:relative; width:100%; height:100%; border-radius:28px; overflow:hidden; box-shadow:var(--shadow); background:var(--card-yellow);}
@@ -342,7 +364,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
   /* modals center nicely instead of sheeting up from the bottom */
   .overlay{ align-items:center; background:rgba(47,82,51,0.5); }
   .sheet-wrap{ max-width:480px; }
-  .sheet{ border-radius:28px; max-width:480px; max-height:85vh; }
+  .sheet{ border-radius:28px; max-width:480px; max-height:85vh; max-height:85dvh; }
 
   /* admin dashboard gets more breathing room too */
   #adminApp{ max-width:900px; border-radius:28px; margin:0 auto; box-shadow:0 20px 60px rgba(47,82,51,0.12); overflow:hidden; }

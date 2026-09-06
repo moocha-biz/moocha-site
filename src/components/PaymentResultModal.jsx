@@ -72,7 +72,8 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
       {order && (
         <>
           <div className="order-confirm-id">Order #{order.id}</div>
-          <div className="sheet-sub" style={{ textAlign: 'center' }}>Your loyalty stamps will be given when you collect this order.</div>
+          <div className="sheet-sub" style={{ textAlign: 'center' }}>Your loyalty stamps will be given when you collect this order. Quote order #{order.id} at pickup, or find it later under My Rewards.</div>
+
           {collectionWindow && (
             <div className="closed-banner" style={{ padding: '12px 14px', marginBottom: 14, background: 'var(--mint)' }}>
               <div className="heading" style={{ fontSize: 14, color: 'var(--green-dark)' }}>🕐 ready for pickup:</div>
@@ -83,7 +84,6 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
             <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}</span><span>{money(it.lineTotal)}</span></div>
           ))}
           <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
-          <div className="sheet-sub" style={{ textAlign: 'center', marginTop: 10 }}>Quote order #{order.id} at pickup, or find it later under My Rewards.</div>
         </>
       )}
       <div className="sheet-sub" style={{ textAlign: 'center', marginTop: 4 }}>See you soon! 👋</div>
