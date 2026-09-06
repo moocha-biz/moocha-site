@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import useDocumentMeta from '../lib/useDocumentMeta.js';
 
 export default function NotFound() {
-  useDocumentMeta('Page Not Found — Moocha', 'This page doesn\'t exist.', { noindex: true });
+  useDocumentMeta('page not found - moocha', 'this page doesn\'t exist.', { noindex: true });
 
   return (
     <div style={{
@@ -14,7 +14,7 @@ export default function NotFound() {
           nothing here 🍃
         </div>
         <div style={{ fontSize: 14, color: 'var(--brand)', marginBottom: 22, maxWidth: 320 }}>
-          This page doesn't exist — but the menu does.
+          This page doesn't exist - but the menu does.
         </div>
         <Link
           to="/menu"

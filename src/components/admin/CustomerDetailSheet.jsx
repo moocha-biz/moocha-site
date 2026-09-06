@@ -22,7 +22,7 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
 
   const copyClaimLink = async () => {
     try { await navigator.clipboard.writeText(claimLink); showToast('Link copied ✓'); }
-    catch { showToast('Could not copy — select and copy it manually'); }
+    catch { showToast('Could not copy - select and copy it manually'); }
   };
 
   // `orders` is already fetched newest-first, so slicing here is enough —
@@ -63,7 +63,7 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
       <div className="field">
         <label>Link their stamps to the website</label>
         <div className="sub" style={{ color: 'var(--brand)', marginBottom: 8 }}>
-          For a customer who's only ever ordered in person — this generates a one-time link (valid 15 minutes) that
+          For a customer who's only ever ordered in person - this generates a one-time link (valid 15 minutes) that
           opens their My Rewards page on their own phone. Send it however's easiest while they're with you.
         </div>
         {!claimLink && (
@@ -116,7 +116,7 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
       ))}
       {mine.length > RECENT_ORDERS_SHOWN && (
         <div className="sub" style={{ color: 'var(--brand)', textAlign: 'center', marginTop: 4 }}>
-          + {mine.length - RECENT_ORDERS_SHOWN} more — see Orders tab
+          + {mine.length - RECENT_ORDERS_SHOWN} more - see Orders tab
         </div>
       )}
 

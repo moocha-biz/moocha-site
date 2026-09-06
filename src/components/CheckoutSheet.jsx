@@ -8,7 +8,7 @@ import { fireConfetti } from './Confetti.jsx';
 export default function CheckoutSheet({ onClose }) {
   const {
     sb, myProfile, saveProfile, cart, showToast, settings,
-    redeemedLineId, cartTotalAfterRedeem, clearCart, refreshMyLoyalty, setTab,
+    freeUnitsByLineId, totalFreeUnits, cartTotalAfterRedeem, clearCart, refreshMyLoyalty, setTab,
   } = useMoocha();
   const collectionWindow = formatCollectionWindow(settings.collectionStart, settings.collectionEnd);
   const [name, setName] = useState(myProfile?.name || '');
@@ -23,13 +23,16 @@ export default function CheckoutSheet({ onClose }) {
   // key/conflict handling actually catch the double-submit.
   const [orderId] = useState(() => 'M' + Date.now().toString().slice(-6));
 
-  const isFreeOrder = !!redeemedLineId && cartTotalAfterRedeem === 0;
+  const isFreeOrder = totalFreeUnits > 0 && cartTotalAfterRedeem === 0;
   // Price/name are re-derived server-side from the items table — only
-  // itemId, sugar, qty, and which line is redeemed actually matter here,
-  // the rest is display-only. Both edge functions share this exact shape.
-  const buildItems = () => cart.map(l => ({
-    itemId: l.itemId, sugar: l.sugar, qty: l.qty, ...(l.lineId === redeemedLineId ? { redeemed: true } : {}),
-  }));
+  // itemId, sugar, qty, and how many units (if any) are free actually
+  // matter here, the rest is display-only. Both edge functions share this
+  // exact shape, and both independently re-derive the free count from the
+  // server's own verified stamp balance rather than trusting freeQty as-is.
+  const buildItems = () => cart.map(l => {
+    const freeQty = freeUnitsByLineId[l.lineId] || 0;
+    return { itemId: l.itemId, sugar: l.sugar, qty: l.qty, ...(freeQty > 0 ? { redeemed: true, freeQty } : {}) };
+  });
 
   const placeFreeOrder = async (profile) => {
     const { data, error } = await sb.functions.invoke('redeem-order', {
@@ -39,7 +42,7 @@ export default function CheckoutSheet({ onClose }) {
       },
     });
     if (error || data?.error || !data?.order) {
-      showToast(data?.error || error?.message || "Couldn't place your order — check your connection and try again");
+      showToast(data?.error || error?.message || "Couldn't place your order - check your connection and try again");
       setBusy(false);
       return;
     }
@@ -58,8 +61,8 @@ export default function CheckoutSheet({ onClose }) {
     // (spaces/dashes aside, get_my_orders/get_my_stamps match phone
     // exactly), not just fail loudly.
     const normalizedPhone = normalizeSgPhone(phone);
-    if (!normalizedPhone) { showToast("That doesn't look like a valid mobile number — check and try again"); return; }
-    if (!sb) { showToast("PayNow isn't set up yet — see README.md"); return; }
+    if (!normalizedPhone) { showToast("That doesn't look like a valid mobile number - check and try again"); return; }
+    if (!sb) { showToast("PayNow isn't set up yet - see README.md"); return; }
     setBusy(true);
     const profile = { name: name.trim(), phone: normalizedPhone, email: email.trim() };
     saveProfile(profile);
@@ -96,14 +99,14 @@ export default function CheckoutSheet({ onClose }) {
         // back to a generic network-ish message when there isn't one, so
         // this never falsely claims PayNow "isn't set up" for what's
         // really a dropped connection or a one-off server hiccup.
-        showToast(data?.error || "Couldn't start checkout — check your connection and try again");
+        showToast(data?.error || "Couldn't start checkout - check your connection and try again");
         setBusy(false);
         return;
       }
       window.location.href = data.url;
     } catch (err) {
       console.error(err);
-      showToast("Couldn't reach checkout — check your connection and try again");
+      showToast("Couldn't reach checkout - check your connection and try again");
       setBusy(false);
     }
   };
@@ -114,7 +117,7 @@ export default function CheckoutSheet({ onClose }) {
         <div className="sheet-close" />
         <div className="sheet-title" style={{ textAlign: 'center' }}>Free drink redeemed! 🎉</div>
         <div className="order-confirm-id">Order #{redeemedOrder.id}</div>
-        <div className="sheet-sub" style={{ textAlign: 'center' }}>No payment needed — quote order #{redeemedOrder.id} or your name/phone at pickup.</div>
+        <div className="sheet-sub" style={{ textAlign: 'center' }}>No payment needed - quote order #{redeemedOrder.id} or your name/phone at pickup.</div>
         {collectionWindow && (
           <div className="closed-banner" style={{ padding: '12px 14px', marginBottom: 14, background: 'var(--mint)' }}>
             <div className="heading" style={{ fontSize: 14, color: 'var(--green-dark)' }}>🕐 ready for pickup:</div>
@@ -122,7 +125,7 @@ export default function CheckoutSheet({ onClose }) {
           </div>
         )}
         {(redeemedOrder.items || []).map((it, i) => (
-          <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}{it.redeemed ? ' · 🎁 free' : ''}</span><span>{money(it.lineTotal)}</span></div>
+          <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}{it.redeemed ? ` · 🎁 ${it.freeQty || 1} free` : ''}</span><span>{money(it.lineTotal)}</span></div>
         ))}
         <div className="summary-row total"><span>Total</span><span>{money(0)}</span></div>
         <div className="sheet-sub" style={{ textAlign: 'center', marginTop: 10 }}>See you soon! 👋</div>
@@ -137,9 +140,9 @@ export default function CheckoutSheet({ onClose }) {
       <div className="sheet-title">Checkout 🧋</div>
       <div className="sheet-sub">We'll use this for your order and your stamp card.</div>
       {!sb && <div className="demo-banner" style={{ marginBottom: 14 }}>Connect Supabase and Stripe first (see README.md) for PayNow payment to work.</div>}
-      {redeemedLineId && (
+      {totalFreeUnits > 0 && (
         <div className="section-note" style={{ color: 'var(--green-dark)', fontWeight: 800, marginBottom: 4 }}>
-          🎁 1 free drink applied from your stamp card
+          🎁 {totalFreeUnits} free drink{totalFreeUnits > 1 ? 's' : ''} applied from your stamp card
         </div>
       )}
       <div className="field"><label htmlFor="checkout-name">Name</label><input id="checkout-name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>

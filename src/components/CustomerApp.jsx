@@ -12,9 +12,9 @@ import ItemSheet from './ItemSheet.jsx';
 import CheckoutSheet from './CheckoutSheet.jsx';
 
 const TAB_META = {
-  menu: { title: 'Menu — Moocha', description: 'Order fresh matcha drinks from Moocha — browse the menu and preorder for pickup.' },
-  cart: { title: 'Your Cart — Moocha', description: 'Review your order before checkout at Moocha.' },
-  loyalty: { title: 'Rewards — Moocha', description: "Track your Moocha stamp card and loyalty rewards." },
+  menu: { title: 'moocha menu', description: 'yummy matcha drinks made fresh to order at moocha' },
+  cart: { title: 'your cart', description: 'review your order before checkout at moocha.' },
+  loyalty: { title: 'moocha rewards!', description: "track your moocha stamp card and loyalty rewards!" },
 };
 
 export default function CustomerApp({ confirmationActive = false }) {
@@ -53,7 +53,7 @@ export default function CustomerApp({ confirmationActive = false }) {
         {lastSupabaseError && (
           <div className="closed-banner" style={{ margin: '0 20px 10px 20px', padding: '12px 16px' }}>
             <div className="heading" style={{ fontSize: 14 }}>having trouble loading 🌧️</div>
-            <div className="sub" style={{ fontSize: 12.5 }}>Try refreshing the page — if it keeps happening, let us know at the counter.</div>
+            <div className="sub" style={{ fontSize: 12.5 }}>Try refreshing the page - if it keeps happening, let us know at the counter.</div>
             <span className="remove-link" style={{ display: 'inline-block', marginTop: 6 }} onClick={() => setLastSupabaseError(null)}>Dismiss</span>
           </div>
         )}
@@ -83,7 +83,7 @@ export default function CustomerApp({ confirmationActive = false }) {
               a contradiction ("did my order go through or not?"). Swap in a
               neutral message for that narrow window instead. */}
           {cart.length === 0 && (checkoutOpen || confirmationActive) ? (
-            <div className="empty-state" style={{ padding: '20px 10px' }}>🎉 Order confirmed — see the confirmation for details.</div>
+            <div className="empty-state" style={{ padding: '20px 10px' }}>🎉 Order confirmed - see the confirmation for details.</div>
           ) : (
             <CartView onCheckout={() => setCheckoutOpen(true)} onEditLine={startEditLine} />
           )}

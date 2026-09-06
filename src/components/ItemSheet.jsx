@@ -7,7 +7,7 @@ import ItemTags from './ItemTags.jsx';
 
 export default function ItemSheet({ item, editLine, onClose }) {
   const { addLineToCart, updateLine, showToast, ordersOpen, cart } = useMoocha();
-  const sugarLevels = (item.sugarLevels && item.sugarLevels.length) ? item.sugarLevels : DEFAULT_SUGAR_LEVELS;
+  const sugarLevels = item.sugarLevels != null ? item.sugarLevels : DEFAULT_SUGAR_LEVELS;
   // Stock is tracked per item, not per sugar level — so this counts every
   // cart line for this item regardless of sugar choice (excluding the line
   // being edited), so re-adding the same drink across separate visits to
@@ -63,7 +63,7 @@ export default function ItemSheet({ item, editLine, onClose }) {
         <div className="item-name-tags"><ItemTags tags={item.customTags} /></div>
       </div>
       <div className="sheet-sub">{item.desc}</div>
-      {remaining != null && remaining > 0 && remaining < 5 && <div className="low-stock-tag" style={{ marginTop: -8, marginBottom: 10 }}>🔥 only {remaining} left this week — grab yours!</div>}
+      {remaining != null && remaining > 0 && remaining < 5 && <div className="low-stock-tag" style={{ marginTop: -8, marginBottom: 10 }}>🔥 only {remaining} left this week - grab yours!</div>}
       {sugarLevels.length > 0 && (
         <div className="opt-group">
           <div className="opt-label">Sweetness <span className="opt-required">pick one</span></div>

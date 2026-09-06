@@ -13,7 +13,7 @@ export default function MenuView({ onOpenItem }) {
   const closedNotice = !ordersOpen && (
     <div className="closed-banner" style={{ padding: '14px 16px', marginBottom: 14 }}>
       <div className="heading" style={{ fontSize: 15 }}>taking a little break 💚</div>
-      <div className="sub">browse away — we'll open up checkout again soon!</div>
+      <div className="sub">browse away - we'll open up checkout again soon!</div>
     </div>
   );
 
@@ -21,7 +21,7 @@ export default function MenuView({ onOpenItem }) {
   const collectionNotice = collectionWindow && (
     <div className="closed-banner" style={{ padding: '14px 16px', marginBottom: 14, background: 'var(--mint)' }}>
       <div className="heading" style={{ fontSize: 15, color: 'var(--green-dark)' }}>🕐 pickup window:</div>
-      <div className="sub" style={{ color: 'var(--green-dark)' }}>orders placed now are ready for collection {collectionWindow}</div>
+      <div className="sub" style={{ color: 'var(--green-dark)' }}>orders will be ready for collection on {collectionWindow}</div>
     </div>
   );
 
@@ -30,7 +30,7 @@ export default function MenuView({ onOpenItem }) {
       <>
         {closedNotice}
         {collectionNotice}
-        <div className="coming-soon"><div className="heading">nothing here yet 🍃</div>more treats coming soon — check back!</div>
+        <div className="coming-soon"><div className="heading">nothing here yet 🍃</div>more treats coming soon - check back!</div>
       </>
     );
   }

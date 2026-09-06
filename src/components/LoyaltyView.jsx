@@ -29,8 +29,8 @@ export default function LoyaltyView() {
   return (
     <>
       <div className="section-label">Your stamp card 🌿</div>
-      <div className="section-note">1 stamp per order · {STAMP_GOAL} stamps = a free drink · tap the card to flip it</div>
-      <StampCard stamps={totalStamps} flipEnabled rewardMessage="🎉 free drink unlocked — mention it at pickup!" />
+      <div className="section-note">1 stamp per drink · {STAMP_GOAL} stamps = a free drink · tap the card to flip it</div>
+      <StampCard stamps={totalStamps} flipEnabled rewardMessage="🎉 free drink unlocked - mention it at pickup!" />
       <div className="section-label" style={{ marginTop: 24 }}>Your orders</div>
       {ordersLoading ? (
         <div className="empty-state" style={{ padding: '20px 10px' }}>Loading your orders…</div>
@@ -43,7 +43,7 @@ export default function LoyaltyView() {
           </div>
           <div className="order-row-right"><div className="oprice">{money(o.total)}</div></div>
         </div>
-      )) : <div className="empty-state" style={{ padding: '20px 10px' }}>No orders yet — your first one starts your card 🐮</div>}
+      )) : <div className="empty-state" style={{ padding: '20px 10px' }}>No orders yet - your first one starts your card 🐮</div>}
     </>
   );
 }

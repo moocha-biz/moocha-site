@@ -80,7 +80,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .overlay{ position:fixed; inset:0; background:rgba(47,82,51,0.45); display:none; align-items:flex-end; justify-content:center; z-index:100;}
 .overlay.show{ display:flex; }
 .overlay.center{ align-items:center; }
-.sheet-wrap{ position:relative; width:100%; max-width:460px; }
+.sheet-wrap{ position:relative; width:100%; max-width:460px; min-width:0; }
 .sheet{ background:var(--cream2); width:100%; max-width:460px; border-radius:32px 32px 0 0; max-height:88vh; overflow-y:auto; overflow-x:hidden; padding:20px 20px 30px 20px; animation: sheetup .22s ease; scrollbar-width:none;}
 .sheet::-webkit-scrollbar{ display:none;}
 .sheet.card-modal{ border-radius:28px; margin:0 20px; max-height:82vh;}
@@ -97,7 +97,11 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
   .sheet.full-mobile > .btn-primary:last-child{ margin-top:auto; }
 }
 .sheet-item-thumb{ position:relative; margin:-20px -20px 14px -20px; }
-.sheet-item-thumb .item-thumb{ aspect-ratio:16/10; }
+/* The list thumbnail crops to fill a small square, but this bigger sheet
+   photo should show the whole drink instead of cropping its top/bottom off
+   to fit a fixed 16:10 box. */
+.sheet-item-thumb .item-thumb{ aspect-ratio:16/10; background:var(--paper); }
+.sheet-item-thumb .item-thumb img{ object-fit:contain; }
 .sheet-float-close{ position:absolute; top:14px; right:14px; z-index:20; width:32px;height:32px; border-radius:50%; border:none; background:rgba(0,0,0,0.4); color:#fff; font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; }
 .sheet-float-close:hover{ background:rgba(0,0,0,0.55); }
 @keyframes sheetup{ from{transform:translateY(30px); opacity:0;} to{transform:translateY(0); opacity:1;} }
@@ -139,11 +143,11 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .mini-btn{ width:28px;height:28px;border-radius:9px;border:none; background:var(--mint); cursor:pointer; font-weight:800; color:var(--green-dark);}
 .remove-link{ font-size:11.5px; color:var(--blush-deep); font-weight:700; cursor:pointer;}
 .edit-link{ font-size:11.5px; color:var(--green-dark); font-weight:700; cursor:pointer;}
-.redeem-pill{ font-size:11px; font-weight:800; color:#6b4c05; background:var(--sun); padding:4px 12px; border-radius:999px; cursor:pointer; font-family:'Baloo 2'; white-space:nowrap;}
-.redeem-pill.redeemed{ background:var(--sun-deep); color:#4a3400;}
 
-.summary-row{ display:flex; justify-content:space-between; font-size:13.5px; padding:6px 0; color:#5b6e54; font-weight:700;}
+.summary-row{ display:flex; justify-content:space-between; gap:8px; font-size:13.5px; padding:6px 0; color:#5b6e54; font-weight:700;}
 .summary-row.total{ font-family:'Baloo 2'; font-weight:800; font-size:17px; color:var(--green-dark); border-top:2px dashed var(--line); margin-top:6px; padding-top:12px;}
+.summary-row > span:first-child{ flex:1 1 auto; min-width:0; overflow-wrap:anywhere;}
+.summary-row > span:last-child{ flex:0 0 auto; white-space:nowrap;}
 
 .field{ margin-bottom:14px;}
 .field label{ font-size:12.5px; font-weight:800; color:var(--green-dark); display:block; margin-bottom:6px; font-family:'Baloo 2';}
@@ -168,20 +172,27 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .stamp-card-flip-inner{ position:relative; width:100%; aspect-ratio:1531/1080; transform-style:preserve-3d; transition:transform .6s cubic-bezier(.45,.05,.15,1); }
 .stamp-card-flip.flipped .stamp-card-flip-inner{ transform:rotateY(180deg); }
 .stamp-card-static{ position:relative; width:100%; aspect-ratio:1531/1080; }
-.stamp-card-face{ position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden; border-radius:28px; overflow:hidden; box-shadow:var(--shadow);}
+.stamp-card-face{ position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden; }
 .stamp-card-static .stamp-card-face{ position:relative; inset:auto; width:100%; height:100%; }
+/* Clipping (border-radius/overflow/shadow) lives on this inner wrapper rather
+   than on .stamp-card-face itself — combining overflow:hidden with
+   backface-visibility:hidden on the same 3D-transformed element makes some
+   mobile browsers (Android Chrome/WebView) fail to hide the rotated-away
+   face, letting its mirrored content bleed through the visible one. */
+.stamp-card-face-inner{ position:relative; width:100%; height:100%; border-radius:28px; overflow:hidden; box-shadow:var(--shadow);}
 
 .stamp-card-border-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:fill; pointer-events:none; z-index:0;}
 
 /* Positions below are measured directly off the reference composites
    (13.svg / 14.svg) as percentages of the card face, not eyeballed —
    see the PR/commit notes for the pixel-bbox measurements they came from. */
-.stamp-card-front{ background:var(--paper); }
+.stamp-card-front .stamp-card-face-inner{ background:var(--paper); }
 .stamp-card-tagline{ position:absolute; left:13.7%; top:25.9%; width:42.6%; z-index:1; pointer-events:none;}
 .stamp-card-wordmark{ position:absolute; left:12.3%; top:39.5%; width:67.5%; z-index:1; pointer-events:none;}
 .stamp-card-star-deco{ position:absolute; top:15.4%; right:4.7%; width:32.9%; pointer-events:none; z-index:1;}
 
-.stamp-card-back{ background:var(--card-yellow); transform:rotateY(180deg); }
+.stamp-card-back{ transform:rotateY(180deg); }
+.stamp-card-back .stamp-card-face-inner{ background:var(--card-yellow); }
 .stamp-card-static .stamp-card-back{ transform:none; }
 .stamp-card-headline{ position:absolute; left:26%; top:14%; width:48.9%; z-index:1; pointer-events:none;}
 .stamp-grid{ position:absolute; left:8.25%; top:24.8%; width:83.4%; height:61.7%; display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(2,1fr); gap:6.6% 4.4%; z-index:1;}

@@ -52,14 +52,14 @@ export default function SettingsTab() {
     const next = { ...settings, preorderCloseAt: fromLocalInputValue(closeAt) };
     setSettings(next);
     await persistSettings(next);
-    showToast(closeAt ? 'Auto-close time set ✓' : 'Auto-close cleared — orders stay open until you toggle them off');
+    showToast(closeAt ? 'Auto-close time set ✓' : 'Auto-close cleared - orders stay open until you toggle them off');
   };
 
   const saveCollectionHours = async () => {
     if (!collectionStart || !collectionEnd) { showToast('Set both a start and end time'); return; }
-    if (!window.confirm("This starts a new sale week — every item's preorder and walk-in stock counts reset to 0. Continue?")) return;
+    if (!window.confirm("This starts a new sale week - every item's preorder and walk-in stock counts reset to 0. Continue?")) return;
     await setCollectionHours(fromLocalInputValue(collectionStart), fromLocalInputValue(collectionEnd));
-    showToast('Collection hours saved — stock counts reset ✓');
+    showToast('Collection hours saved - stock counts reset ✓');
   };
 
   const submitChangePassword = async () => {
@@ -94,14 +94,14 @@ export default function SettingsTab() {
           <div className="section-note" style={{ marginTop: 4 }}>
             {settings.paymentEnabled && Date.now() < new Date(settings.preorderCloseAt).getTime()
               ? `Will auto-close at ${new Date(settings.preorderCloseAt).toLocaleString()}`
-              : `Auto-close time (${new Date(settings.preorderCloseAt).toLocaleString()}) has passed — orders are closed`}
+              : `Auto-close time (${new Date(settings.preorderCloseAt).toLocaleString()}) has passed - orders are closed`}
           </div>
         )}
         <div className="field" style={{ marginTop: 10 }}>
           <label htmlFor="settings-auto-close">Auto-close preorders at</label>
           <input id="settings-auto-close" type="datetime-local" value={closeAt} onChange={e => setCloseAt(e.target.value)} />
         </div>
-        <div className="section-note" style={{ marginTop: -6 }}>Orders close on their own at this time — no need to remember to flip the toggle above. Leave blank and save to remove the cutoff.</div>
+        <div className="section-note" style={{ marginTop: -6 }}>Orders close on their own at this time - no need to remember to flip the toggle above. Leave blank and save to remove the cutoff.</div>
         <button className="btn-secondary" style={{ marginBottom: 0 }} disabled={!autoCloseDirty} onClick={saveAutoClose}>{closeAt ? 'Save auto-close time' : 'Clear auto-close time'}</button>
       </div>
 
@@ -124,7 +124,7 @@ export default function SettingsTab() {
       <div className="settings-section" style={{ marginBottom: 0 }}>
         <div className="section-label" style={{ marginTop: 0 }}>Your password</div>
         <div className="section-note">
-          {staffEmail ? `Changes the password for your own login (${staffEmail}) — no one else's.` : 'This is a shared passphrase for all staff — changing it changes it for everyone.'}
+          {staffEmail ? `Changes the password for your own login (${staffEmail}) - no one else's.` : 'This is a shared passphrase for all staff - changing it changes it for everyone.'}
         </div>
         <div className="field">
           <label htmlFor="settings-new-password">New password</label>

@@ -28,7 +28,7 @@ export default class ErrorBoundary extends React.Component {
             something went wrong 🍃
           </div>
           <div style={{ fontSize: 14, color: '#85A573', marginBottom: 22, maxWidth: 320 }}>
-            Sorry about that — a refresh usually fixes it. Your cart is saved.
+            Sorry about that - a refresh usually fixes it. Your cart is saved.
           </div>
           <button
             onClick={() => window.location.reload()}
