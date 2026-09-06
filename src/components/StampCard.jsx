@@ -11,7 +11,7 @@ export default function StampCard({ stamps, flipEnabled = true, rewardMessage })
   // un-squishes — same "flip" feel, nothing for a browser's 3D transform
   // support to get wrong.
   const [showFront, setShowFront] = useState(false);
-  const [squished, setSquished] = useState(false);
+  const [flipping, setFlipping] = useState(false);
   const totalStamps = stamps || 0;
   const progress = totalStamps > 0 && totalStamps % STAMP_GOAL === 0 ? STAMP_GOAL : totalStamps % STAMP_GOAL;
   const readyForReward = totalStamps > 0 && totalStamps % STAMP_GOAL === 0;
@@ -51,17 +51,19 @@ export default function StampCard({ stamps, flipEnabled = true, rewardMessage })
     );
   }
 
+  // Ignoring a click mid-animation avoids two overlapping flips glitching
+  // into each other — the content swap lands in the flat, fully-squished
+  // part of the animation (see the keyframes) so it's invisible either way.
   const handleFlip = () => {
-    setSquished(true);
-    setTimeout(() => {
-      setShowFront(f => !f);
-      setSquished(false);
-    }, 150);
+    if (flipping) return;
+    setFlipping(true);
+    setTimeout(() => setShowFront(f => !f), 230);
+    setTimeout(() => setFlipping(false), 460);
   };
 
   return (
     <div
-      className={`stamp-card-flip ${squished ? 'squished' : ''}`}
+      className={`stamp-card-flip ${flipping ? 'flipping' : ''}`}
       onClick={handleFlip}
       role="button"
       tabIndex={0}
