@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { sb } from './lib/supabaseClient.js';
 import { getLocal, setLocal } from './lib/storage.js';
@@ -43,12 +43,6 @@ export function MoochaProvider({ children }) {
   const [cart, setCart] = useState(() => getLocal('moocha_cart', []));
   const [myProfile, setMyProfile] = useState(() => getLocal('moocha_my_profile', null));
   const [myStamps, setMyStamps] = useState(0);
-  // Which cart line (by lineId) has 1 unit marked as the loyalty reward.
-  // Deliberately not persisted to localStorage like the cart itself — if
-  // the page reloads mid-checkout, re-picking a line is a small ask and
-  // safer than trusting a stale selection days later. Not real money is
-  // at stake either way since the server re-verifies eligibility itself.
-  const [redeemedLineId, setRedeemedLineId] = useState(null);
 
   // ---------------- shared/backend-derived state ----------------
   const [menu, setMenu] = useState(DEFAULT_MENU);
@@ -423,7 +417,7 @@ export function MoochaProvider({ children }) {
   // saves the resulting profile/token exactly like a first paid order
   // would have.
   const claimRewards = useCallback(async (code) => {
-    if (!sb) return { error: "Rewards aren't set up yet — see README.md" };
+    if (!sb) return { error: "Rewards aren't set up yet - see README.md" };
     const { data, error } = await sb.rpc('redeem_customer_claim', { p_code: code });
     if (error) return { error: error.message || 'This link has expired or was already used' };
     saveProfile({ name: data.name || '', phone: data.phone });
@@ -441,43 +435,38 @@ export function MoochaProvider({ children }) {
   // Redeeming online (as opposed to in person, where staff can just look at
   // the customer) needs proof this browser actually owns the phone's
   // stamps — the same customerToken minted after a first paid order and
-  // otherwise only used to read the (read-only) My Rewards page.
-  const loyaltyRedeemEligible = !!(myProfile?.phone && myProfile?.customerToken && myStamps >= STAMP_GOAL);
-  const redeemedLine = redeemedLineId ? cart.find(l => l.lineId === redeemedLineId) : null;
-  // Only 1 unit of the chosen line is ever free, same as the walk-in flow.
-  const redeemDiscount = redeemedLine ? redeemedLine.lineTotal / redeemedLine.qty : 0;
-  const cartTotalAfterRedeem = Math.max(0, cartSubtotal - redeemDiscount);
-
-  // Clears the selection the moment it stops making sense — the line was
-  // removed/cart cleared, or stamps dropped below goal after a refresh —
-  // rather than leaving a stale "1 free" applied to nothing. Only the
-  // eligibility-loss case gets a toast: the line-removed case is something
-  // the customer just did themselves (obvious why it's gone), but losing
-  // eligibility happens invisibly in the background and would otherwise
-  // look like the app silently dropped their reward.
-  useEffect(() => {
-    if (!redeemedLineId) return;
-    if (!redeemedLine) { setRedeemedLineId(null); return; }
-    if (!loyaltyRedeemEligible) {
-      setRedeemedLineId(null);
-      showToast("Your free drink selection was cleared — you're not eligible right now");
+  // otherwise only used to read the (read-only) My Rewards page. Without a
+  // verified token, only this cart's own quantity can earn a free drink
+  // (self-funded by what's being paid for right now, nothing to steal) —
+  // any pre-existing banked stamps are ignored until ownership is proven.
+  const verifiedStamps = (myProfile?.phone && myProfile?.customerToken) ? (myStamps || 0) : 0;
+  const cartQtyTotal = cart.reduce((s, l) => s + l.qty, 0);
+  // Every STAMP_GOAL-th drink — counting stamps already banked plus every
+  // drink in this very cart — is free, the same "buy 7, the 8th's on us"
+  // rule a physical stamp card enforces. A big enough cart can cross that
+  // line more than once (e.g. 16 drinks from 0 stamps = 2 free), each
+  // crossing landing on a fresh card. The server re-derives this exact same
+  // way from its own verified stamp count — the client's guess here is only
+  // for display and for picking which endpoint to call.
+  const totalFreeUnits = cartQtyTotal > 0
+    ? Math.min(Math.floor((verifiedStamps + cartQtyTotal) / STAMP_GOAL), cartQtyTotal)
+    : 0;
+  // Always the cheapest unit(s) in the cart, never left to the customer to
+  // pick — maximizes what they still pay for regardless of order composition.
+  const freeUnitsByLineId = useMemo(() => {
+    const map = {};
+    let remaining = totalFreeUnits;
+    if (remaining <= 0) return map;
+    const sorted = [...cart].sort((a, b) => (a.lineTotal / a.qty) - (b.lineTotal / b.qty));
+    for (const line of sorted) {
+      if (remaining <= 0) break;
+      const take = Math.min(line.qty, remaining);
+      if (take > 0) { map[line.lineId] = take; remaining -= take; }
     }
-  }, [redeemedLineId, redeemedLine, loyaltyRedeemEligible, showToast]);
-
-  // The moment an eligible customer's cart renders, auto-apply the reward to
-  // their priciest line (biggest saving) instead of showing the full price
-  // and waiting for them to notice/tap "make 1 free" themselves — otherwise
-  // the line/Total/Checkout all briefly show the pre-reward price even
-  // though the banner already promised a free drink. Runs once per session:
-  // the ref stops it from re-firing and overriding a deliberate deselect.
-  const autoRedeemAppliedRef = useRef(false);
-  useEffect(() => {
-    if (autoRedeemAppliedRef.current) return;
-    if (!loyaltyRedeemEligible || cart.length === 0) return;
-    const priciest = cart.reduce((a, b) => (b.lineTotal / b.qty) > (a.lineTotal / a.qty) ? b : a);
-    autoRedeemAppliedRef.current = true;
-    setRedeemedLineId(priciest.lineId);
-  }, [loyaltyRedeemEligible, cart, setRedeemedLineId]);
+    return map;
+  }, [cart, totalFreeUnits]);
+  const redeemDiscount = cart.reduce((s, l) => s + (freeUnitsByLineId[l.lineId] || 0) * (l.lineTotal / l.qty), 0);
+  const cartTotalAfterRedeem = Math.max(0, cartSubtotal - redeemDiscount);
 
   // Adding the same item + sugar level combo again merges into the
   // existing line (qty bumped) instead of creating a second, confusing
@@ -620,7 +609,7 @@ export function MoochaProvider({ children }) {
     tab, setTab, activeCat, setActiveCat,
     cart, cartSubtotal, addLineToCart, cartQty, updateLine, removeLine, clearCart,
     myProfile, saveProfile, saveCustomerToken, myStamps, refreshMyLoyalty, fetchMyOrders, claimRewards,
-    redeemedLineId, setRedeemedLineId, loyaltyRedeemEligible, redeemDiscount, cartTotalAfterRedeem,
+    freeUnitsByLineId, totalFreeUnits, redeemDiscount, cartTotalAfterRedeem,
     // shared state
     menu, setMenu, settings, setSettings, ordersOpen, orders, setOrders, customers, setCustomers,
     lastSupabaseError, setLastSupabaseError,

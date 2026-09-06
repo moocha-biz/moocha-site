@@ -1,12 +1,13 @@
 // supabase/functions/redeem-order/index.ts
 //
 // Places a preorder that's entirely covered by a customer's loyalty reward
-// (cart total $0 after redeeming 1 free unit) — Stripe Checkout can't
-// process a $0 total at all, so this bypasses Stripe and writes the order
-// directly, the same way log_walkin_order does for a walk-in's redemption.
-// A redemption alongside other paid items instead goes through the normal
-// create-checkout-session/Stripe flow, which handles the discount as a $0
-// Stripe line item within a still-positive total.
+// (cart total $0 after redeeming every unit in it, one or more) — Stripe
+// Checkout can't process a $0 total at all, so this bypasses Stripe and
+// writes the order directly, the same way log_walkin_order does for a
+// walk-in's redemption. A redemption alongside other paid items instead
+// goes through the normal create-checkout-session/Stripe flow, which
+// handles the discount as $0 Stripe line item(s) within a still-positive
+// total.
 //
 // Needs the same secrets as create-checkout-session/stripe-webhook (see
 // README.md, Part 4).
@@ -53,27 +54,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    const redeemedLines = cartLines.filter((l) => l.redeemed === true);
-    if (redeemedLines.length !== 1) {
-      return new Response(JSON.stringify({ error: "Exactly one item must be marked as your free drink" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Every unit in every line is free here — this endpoint only exists for
+    // a cart that's entirely covered by the reward (see the file header).
+    // How many free units that actually is gets checked against the
+    // customer's real, verified balance next.
+    const totalFreeQty = cartLines.reduce((s, l) => s + (Number(l.qty) || 0), 0);
 
     // Never trust the client's word that this phone is eligible — re-check
     // against the database, the same way create-checkout-session does.
     // This is just a friendly early check to skip the stock lookup below
     // for an obviously-ineligible request; place_redeemed_order() re-checks
     // (and actually deducts) under a row lock, so it's what really decides
-    // eligibility.
+    // eligibility. Unlike create-checkout-session, nothing here is being
+    // freshly paid for, so only pre-existing, already-verified stamps count
+    // — a $0 order can't fund its own reward the way a mixed cart can.
     const { data: rewardRow } = await supabase
       .from("customers")
       .select("stamps")
       .eq("phone", trimmedPhone)
       .eq("access_token", customerToken)
       .maybeSingle();
-    if (!rewardRow || (rewardRow.stamps || 0) < STAMP_GOAL) {
+    if (!rewardRow || Math.floor((rewardRow.stamps || 0) / STAMP_GOAL) < totalFreeQty) {
       return new Response(JSON.stringify({ error: "You don't have enough stamps for a free drink yet" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -129,24 +130,11 @@ Deno.serve(async (req) => {
           );
         }
       }
-      const isRedeemedLine = line.redeemed === true;
-      const paidQty = isRedeemedLine ? qty - 1 : qty;
+      // The whole line is free — every unit of it, not just one.
       metaItems.push({
-        itemId: row.id, name: row.name, sugar: line.sugar, qty, lineTotal: Number(row.price) * paidQty,
-        ...(isRedeemedLine ? { redeemed: true } : {}),
+        itemId: row.id, name: row.name, sugar: line.sugar, qty, lineTotal: 0,
+        redeemed: true, freeQty: qty,
       });
-    }
-
-    const total = metaItems.reduce((s, it) => s + it.lineTotal, 0);
-    // The whole point of this endpoint is a $0 order — anything else means
-    // the frontend picked the wrong endpoint (this cart should have gone
-    // through create-checkout-session/Stripe instead), so refuse rather
-    // than quietly give away paid items for free.
-    if (total !== 0) {
-      return new Response(
-        JSON.stringify({ error: "This order isn't fully covered by your reward — checking out again should fix it" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
     }
 
     // Order insert, stamp deduction, and stock booking all happen inside

@@ -13,7 +13,7 @@ function OrderProgress({ status }) {
   if (status === 'Payment failed') {
     return (
       <div style={{ background: 'var(--blush)', color: '#8a3a2a', borderRadius: 14, padding: '12px 16px', marginBottom: 18, fontWeight: 800, fontFamily: "'Baloo 2'", textAlign: 'center', fontSize: 13 }}>
-        ⚠️ Payment failed — checkout was never completed
+        ⚠️ Payment failed - checkout was never completed
       </div>
     );
   }
@@ -89,7 +89,7 @@ function PaymentField({ order }) {
   if (!order.stripeSessionId) {
     const isRedeemed = (order.items || []).some(it => it.redeemed);
     const label = isRedeemed
-      ? '🎁 Redeemed with stamps — no payment'
+      ? '🎁 Redeemed with stamps - no payment'
       : order.orderType === 'walkin'
         ? 'Cash / no payment record (walk-in)'
         : 'No payment record';
@@ -144,7 +144,7 @@ export default function OrderDetailSheet({ order, onClose }) {
 
   const collect = async () => {
     await markOrderCollected(order.id);
-    showToast('Marked collected — stamp given ✓');
+    showToast('Marked collected - stamps given ✓');
     onClose();
   };
 
@@ -190,7 +190,7 @@ export default function OrderDetailSheet({ order, onClose }) {
       <div className="field">
         <label>Collected at</label>
         <div className="admin-item-name">
-          {order.collectedAt ? new Date(order.collectedAt).toLocaleString() : '— not yet collected —'}
+          {order.collectedAt ? new Date(order.collectedAt).toLocaleString() : 'not yet collected'}
           {order.collectedBy ? ` · ${order.collectedBy}` : ''}
         </div>
       </div>
@@ -201,7 +201,7 @@ export default function OrderDetailSheet({ order, onClose }) {
         <div className="field">
           <label>Refunded at</label>
           <div className="admin-item-name" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>
-            {order.refundedAt ? new Date(order.refundedAt).toLocaleString() : '—'}
+            {order.refundedAt ? new Date(order.refundedAt).toLocaleString() : '-'}
             {order.refundedBy ? ` · ${order.refundedBy}` : ''}
             {order.refundId ? ` · ${order.refundId}` : ''}
           </div>
@@ -215,7 +215,7 @@ export default function OrderDetailSheet({ order, onClose }) {
       <div className="section-label" style={{ marginTop: 10 }}>Items</div>
       {(order.items || []).map((it, i) => (
         <div className="summary-row" key={i}>
-          <span>{it.name}{it.sugar ? ` · ${it.sugar}` : ''} x{it.qty}{it.redeemed ? ' · 🎁 1 free' : ''}</span>
+          <span>{it.name}{it.sugar ? ` · ${it.sugar}` : ''} x{it.qty}{it.redeemed ? ` · 🎁 ${it.freeQty || 1} free` : ''}</span>
           <span>{money(it.lineTotal)}</span>
         </div>
       ))}

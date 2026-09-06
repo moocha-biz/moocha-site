@@ -26,7 +26,7 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
     cat,
     items: menu.categories[cat].filter(i => !i.isHidden && (!q || i.name.toLowerCase().includes(q))),
   })).filter(({ items }) => items.length > 0);
-  const sugarLevelsFor = (item) => (item.sugarLevels && item.sugarLevels.length) ? item.sugarLevels : DEFAULT_SUGAR_LEVELS;
+  const sugarLevelsFor = (item) => item.sugarLevels != null ? item.sugarLevels : DEFAULT_SUGAR_LEVELS;
   const remaining = (item) => item.walkinLimit == null ? null : Math.max(0, item.walkinLimit - (item.walkinSold || 0));
   const currentSugar = (item) => pendingSugar[item.id] || (sugarLevelsFor(item).includes('50%') ? '50%' : sugarLevelsFor(item)[0]);
   const qtyForItem = (itemId) => Object.values(linesByKey).filter(l => l.itemId === itemId).reduce((s, l) => s + l.qty, 0);
@@ -86,13 +86,13 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
     <>
       <div className="sheet-close" />
       <div className="sheet-title">New walk-in order</div>
-      <div className="sheet-sub">Logged as Received — mark it collected once handed over to award the stamp.</div>
+      <div className="sheet-sub">Logged as Received - mark it collected once handed over to award the stamp.</div>
 
       <div className="field"><label htmlFor="walkin-name">Customer name (optional)</label><input id="walkin-name" value={name} onChange={e => setName(e.target.value)} /></div>
-      <div className="field"><label htmlFor="walkin-phone">Phone (optional — needed for a stamp)</label><input id="walkin-phone" value={phone} onChange={e => { setPhone(e.target.value); setRedeemKey(null); }} inputMode="tel" /></div>
+      <div className="field"><label htmlFor="walkin-phone">Phone (optional - needed for a stamp)</label><input id="walkin-phone" value={phone} onChange={e => { setPhone(e.target.value); setRedeemKey(null); }} inputMode="tel" /></div>
       {canRedeem && (
         <div className="section-note" style={{ marginTop: -8, marginBottom: 12, color: 'var(--green-dark)', fontWeight: 800 }}>
-          🎁 {customerStamps} stamps — eligible for a free drink! Tap "make 1 free" on a line below.
+          🎁 {customerStamps} stamps - eligible for a free drink! Tap "make 1 free" on a line below.
         </div>
       )}
 
@@ -125,11 +125,13 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
                   </div>
                   <button className="btn-secondary btn-compact" disabled={soldOutHere || atCap} onClick={() => addUnit(item, currentSugar(item))}>+ Add</button>
                 </div>
-                <div className="opt-row" style={{ marginTop: 10 }}>
-                  {sugarLevelsFor(item).map(level => (
-                    <button key={level} className={`opt-chip ${currentSugar(item) === level ? 'selected' : ''}`} onClick={() => setPendingSugar(prev => ({ ...prev, [item.id]: level }))}>{level}</button>
-                  ))}
-                </div>
+                {sugarLevelsFor(item).length > 0 && (
+                  <div className="opt-row" style={{ marginTop: 10 }}>
+                    {sugarLevelsFor(item).map(level => (
+                      <button key={level} className={`opt-chip ${currentSugar(item) === level ? 'selected' : ''}`} onClick={() => setPendingSugar(prev => ({ ...prev, [item.id]: level }))}>{level}</button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

@@ -11,7 +11,7 @@ export default function AdminRoute() {
   const { isAdmin } = useMoocha();
   const navigate = useNavigate();
 
-  useDocumentMeta('Staff Login — Moocha', 'Staff dashboard for Moocha.', { noindex: true });
+  useDocumentMeta('staff login - moocha', 'staff dashboard for moocha.', { noindex: true });
 
   if (!isAdmin) {
     return (

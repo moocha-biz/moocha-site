@@ -31,7 +31,7 @@ export default function AdminApp() {
         ))}
       </div>
       <div className="admin-main">
-        {!sb && <div className="demo-banner">⚠️ Demo mode — Supabase isn't connected yet, so this data is only on this device. See README.md.</div>}
+        {!sb && <div className="demo-banner">⚠️ Demo mode - Supabase isn't connected yet, so this data is only on this device. See README.md.</div>}
         {lastSupabaseError && (
           <div className="demo-banner" style={{ background: 'var(--blush)', color: '#8a3a2a' }}>
             ⚠️ {lastSupabaseError}

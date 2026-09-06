@@ -52,40 +52,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // At most one cart line can carry the customer's loyalty redemption
-    // (1 free unit) — the client flags it, but eligibility is re-verified
-    // here from the database, never trusted from the request. A fully-free
-    // cart (redeeming with nothing else in it) can't come through this
-    // endpoint at all: Stripe Checkout requires a total > 0, so that case
-    // is handled by the separate redeem-order function instead.
-    const redeemedLines = cartLines.filter((l) => l.redeemed === true);
-    if (redeemedLines.length > 1) {
-      return new Response(JSON.stringify({ error: "Only one item can be redeemed as your free drink" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const redeeming = redeemedLines.length === 1;
-    if (redeeming) {
-      const trimmedPhone = String(phone || "").trim();
-      if (!trimmedPhone || !customerToken) {
-        return new Response(JSON.stringify({ error: "Reload My Rewards and try again to redeem your free drink" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    // Every STAMP_GOAL-th drink is free — counting whatever's already
+    // banked on this phone (only trusted once its token is verified against
+    // the database, same as before) plus every drink in this very cart, the
+    // same "buy 7, the 8th's on us" rule a physical stamp card enforces.
+    // Never trusted from the request: recomputed here from scratch and
+    // handed the cheapest unit(s) first, ignoring whatever the client
+    // itself claimed was redeemed.
+    const trimmedPhone = String(phone || "").trim();
+    let verifiedStamps = 0;
+    if (trimmedPhone && customerToken) {
       const { data: rewardRow } = await supabase
         .from("customers")
         .select("stamps")
         .eq("phone", trimmedPhone)
         .eq("access_token", customerToken)
         .maybeSingle();
-      if (!rewardRow || (rewardRow.stamps || 0) < STAMP_GOAL) {
-        return new Response(JSON.stringify({ error: "You don't have enough stamps for a free drink yet" }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      verifiedStamps = rewardRow?.stamps || 0;
     }
 
     const itemIds = cartLines.map((i) => i.itemId).filter(Boolean);
@@ -112,14 +95,12 @@ Deno.serve(async (req) => {
     }
 
     const rowsById = new Map((stockRows || []).map((r) => [r.id, r]));
+
+    // Validate every line and check stock before touching stamps or Stripe —
+    // an oversell or missing item should fail the same way it always did,
+    // independent of anything about redemption.
     // deno-lint-ignore no-explicit-any
-    const metaItems: any[] = [];
-    // One Stripe line item per cart item, so the item names/quantities show
-    // up on Stripe's auto-generated receipt email — a single bundled
-    // "<stall> order" line only ever showed a generic name there, since
-    // Stripe's receipt doesn't render the line item's `description` field.
-    // deno-lint-ignore no-explicit-any
-    const lineItems: any[] = [];
+    const validLines: { line: any; row: any; qty: number }[] = [];
     for (const line of cartLines) {
       const row = rowsById.get(line.itemId);
       if (!row) {
@@ -150,28 +131,58 @@ Deno.serve(async (req) => {
           );
         }
       }
+      validLines.push({ line, row, qty });
+    }
+
+    const cartQtyTotal = validLines.reduce((s, v) => s + v.qty, 0);
+    let freeUnitsRemaining = Math.min(
+      Math.floor((verifiedStamps + cartQtyTotal) / STAMP_GOAL),
+      cartQtyTotal
+    );
+    // Cheapest unit(s) first, never left to the client to pick — sorting a
+    // copy so validLines itself stays in the customer's original cart order
+    // for the Stripe line items below.
+    // deno-lint-ignore no-explicit-any
+    const freeQtyByLine = new Map<any, number>();
+    const byPriceAsc = [...validLines].sort((a, b) => Number(a.row.price) - Number(b.row.price));
+    for (const v of byPriceAsc) {
+      if (freeUnitsRemaining <= 0) break;
+      const take = Math.min(v.qty, freeUnitsRemaining);
+      freeQtyByLine.set(v.line, take);
+      freeUnitsRemaining -= take;
+    }
+
+    // deno-lint-ignore no-explicit-any
+    const metaItems: any[] = [];
+    // One Stripe line item per cart item, so the item names/quantities show
+    // up on Stripe's auto-generated receipt email — a single bundled
+    // "<stall> order" line only ever showed a generic name there, since
+    // Stripe's receipt doesn't render the line item's `description` field.
+    // deno-lint-ignore no-explicit-any
+    const lineItems: any[] = [];
+    for (const { line, row, qty } of validLines) {
       const unitAmount = Math.round(Number(row.price) * 100);
-      const isRedeemedLine = redeeming && line.redeemed === true;
-      // Only 1 unit of the redeemed line is free — split it into a normal
-      // full-price line for the rest of the quantity (omitted entirely if
-      // qty is exactly 1) plus a separate $0 line for that one unit, so the
-      // Stripe receipt still itemizes the drink instead of hiding it.
-      const paidQty = isRedeemedLine ? qty - 1 : qty;
+      const freeQty = freeQtyByLine.get(line) || 0;
+      // Free unit(s) get split into their own $0 line so the Stripe receipt
+      // still itemizes the drink instead of hiding it, alongside a normal
+      // full-price line for whatever's left of that line's quantity
+      // (omitted entirely once freeQty covers the whole line).
+      const paidQty = qty - freeQty;
       if (paidQty > 0) {
         lineItems.push({
           price_data: { currency: "sgd", product_data: { name: String(row.name).slice(0, 250) }, unit_amount: unitAmount },
           quantity: paidQty,
         });
       }
-      if (isRedeemedLine) {
+      if (freeQty > 0) {
         lineItems.push({
           price_data: { currency: "sgd", product_data: { name: `${String(row.name).slice(0, 230)} (reward)` }, unit_amount: 0 },
-          quantity: 1,
+          quantity: freeQty,
         });
       }
       metaItems.push({
         itemId: row.id, name: row.name, sugar: line.sugar, qty, lineTotal: (unitAmount * paidQty) / 100,
-        ...(isRedeemedLine ? { redeemed: true } : {}),
+        ...(freeQty > 0 ? { redeemed: true, freeQty } : {}),
       });
     }
 
@@ -179,7 +190,7 @@ Deno.serve(async (req) => {
     // Stripe Checkout, which requires a total greater than zero — the
     // frontend is expected to route that case to redeem-order instead, so
     // landing here means something upstream didn't branch correctly.
-    if (redeeming && lineItems.every((li) => li.price_data.unit_amount === 0)) {
+    if (lineItems.length > 0 && lineItems.every((li) => li.price_data.unit_amount === 0)) {
       return new Response(
         JSON.stringify({ error: "This order is fully covered by your reward — try checking out again" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

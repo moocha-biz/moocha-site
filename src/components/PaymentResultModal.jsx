@@ -50,7 +50,7 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
       <>
         <div className="sheet-close" />
         <div className="sheet-title" style={{ textAlign: 'center' }}>Checkout canceled</div>
-        <div className="sheet-sub" style={{ textAlign: 'center' }}>No payment was made — your cart is still waiting for you.</div>
+        <div className="sheet-sub" style={{ textAlign: 'center' }}>No payment was made - your cart is still waiting for you.</div>
         <button className="btn-primary" onClick={onRetry}><span>Try again</span><span>→</span></button>
         <button className="btn-secondary" onClick={onClose}>Back to menu</button>
       </>
@@ -66,13 +66,13 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
       )}
       {!order && gaveUp && (
         <div className="sheet-sub" style={{ textAlign: 'center' }}>
-          Payment went through — we're still finalizing your order. Check My Rewards in a moment if it doesn't show up here.
+          Payment went through - we're still finalizing your order. Check My Rewards in a moment if it doesn't show up here.
         </div>
       )}
       {order && (
         <>
           <div className="order-confirm-id">Order #{order.id}</div>
-          <div className="sheet-sub" style={{ textAlign: 'center' }}>Your loyalty stamp will be given when you collect this order.</div>
+          <div className="sheet-sub" style={{ textAlign: 'center' }}>Your loyalty stamps will be given when you collect this order.</div>
           {collectionWindow && (
             <div className="closed-banner" style={{ padding: '12px 14px', marginBottom: 14, background: 'var(--mint)' }}>
               <div className="heading" style={{ fontSize: 14, color: 'var(--green-dark)' }}>🕐 ready for pickup:</div>

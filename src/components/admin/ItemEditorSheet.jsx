@@ -16,7 +16,7 @@ function TagsEditor({ tags, setTags }) {
   return (
     <div className="field">
       <label>Custom tags (e.g. "New!", "Bestseller")</label>
-      {tags.length === 0 && <div className="section-note" style={{ marginBottom: 8 }}>None yet — add one to badge this item on the menu.</div>}
+      {tags.length === 0 && <div className="section-note" style={{ marginBottom: 8 }}>None yet - add one to badge this item on the menu.</div>}
       {tags.map((tag, i) => (
         <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
           <input
@@ -72,7 +72,7 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
   const [price, setPrice] = useState(item ? item.price : '');
   const [category, setCategory] = useState(cat);
   const [iced, setIced] = useState(item?.iced || false);
-  const [sugarLevels, setSugarLevels] = useState(item?.sugarLevels?.length ? [...item.sugarLevels] : [...DEFAULT_SUGAR_LEVELS]);
+  const [sugarLevels, setSugarLevels] = useState(item?.sugarLevels != null ? [...item.sugarLevels] : [...DEFAULT_SUGAR_LEVELS]);
   const [preorderLimit, setPreorderLimit] = useState(item?.preorderLimit ?? '');
   const [walkinLimit, setWalkinLimit] = useState(item?.walkinLimit ?? '');
   const [customTags, setCustomTags] = useState(item?.customTags?.length ? item.customTags.map(t => ({ ...t })) : []);
@@ -98,7 +98,7 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
       const path = `item-${Date.now()}.${ext}`;
       const { error } = await sb.storage.from('menu-photos').upload(path, file, { upsert: true });
       setUploading(false);
-      if (error) { console.error(error); showToast(`Upload failed — ${error.message || 'try again'}`); URL.revokeObjectURL(localPreview); setPhotoUrl(item?.photo || null); return; }
+      if (error) { console.error(error); showToast(`Upload failed - ${error.message || 'try again'}`); URL.revokeObjectURL(localPreview); setPhotoUrl(item?.photo || null); return; }
       const { data } = sb.storage.from('menu-photos').getPublicUrl(path);
       URL.revokeObjectURL(localPreview);
       setPhotoUrl(data.publicUrl);
@@ -162,7 +162,7 @@ export default function ItemEditorSheet({ cat, item, onClose, onSaved }) {
       </div>
       <div className="section-note" style={{ marginTop: -8, marginBottom: 16 }}>Both reset to 0 sold whenever you save new collection hours in Settings.</div>
       <TagsEditor tags={customTags} setTags={setCustomTags} />
-      <RowsEditor label="Sweetness levels for this drink" rows={sugarLevels} setRows={setSugarLevels} addLabel="+ Add sweetness level" emptyNote="None yet — this drink won't offer a sweetness choice until you add one." />
+      <RowsEditor label="Sweetness levels for this drink" rows={sugarLevels} setRows={setSugarLevels} addLabel="+ Add sweetness level" emptyNote="None yet - this drink won't offer a sweetness choice until you add one." />
       <button className="btn-primary" onClick={save}><span>Save item</span><span>→</span></button>
       <button className="btn-secondary" onClick={onClose}>Cancel</button>
     </>
