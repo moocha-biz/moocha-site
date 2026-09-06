@@ -493,8 +493,26 @@ export function MoochaProvider({ children }) {
     });
   }, [saveCartLocal]);
 
+  // Mirrors ItemSheet's changeQty stock check (remaining = preorderLimit -
+  // preorderSold, counted across every cart line for this item regardless
+  // of sugar choice) — without it the +/- stepper here silently let a
+  // customer mash past the limit with no feedback until the server
+  // rejected it at checkout.
   const cartQty = useCallback((lineId, d) => {
     setCart(prev => {
+      const line = prev.find(l => l.lineId === lineId);
+      if (!line) return prev;
+      if (d > 0) {
+        const item = Object.values(menu.categories).flat().find(i => i.id === line.itemId);
+        if (item?.preorderLimit != null) {
+          const remaining = Math.max(0, item.preorderLimit - (item.preorderSold || 0));
+          const totalForItem = prev.filter(l => l.itemId === line.itemId).reduce((s, l) => s + l.qty, 0);
+          if (totalForItem + d > remaining) {
+            showToast(remaining > 0 ? `Only ${remaining} left for preorder this week` : 'Sold out for preorder this week');
+            return prev;
+          }
+        }
+      }
       const next = prev.map(l => {
         if (l.lineId !== lineId) return l;
         const unit = l.lineTotal / l.qty;
@@ -504,7 +522,7 @@ export function MoochaProvider({ children }) {
       saveCartLocal(next);
       return next;
     });
-  }, [saveCartLocal]);
+  }, [saveCartLocal, menu, showToast]);
 
   const updateLine = useCallback((lineId, patch) => {
     setCart(prev => {

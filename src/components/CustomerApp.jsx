@@ -17,8 +17,8 @@ const TAB_META = {
   loyalty: { title: 'Rewards — Moocha', description: "Track your Moocha stamp card and loyalty rewards." },
 };
 
-export default function CustomerApp() {
-  const { tab, setTab, menu, showToast, lastSupabaseError, setLastSupabaseError } = useMoocha();
+export default function CustomerApp({ confirmationActive = false }) {
+  const { tab, setTab, menu, cart, showToast, lastSupabaseError, setLastSupabaseError } = useMoocha();
   const [openItemId, setOpenItemId] = useState(null);
   const [editLine, setEditLine] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -77,7 +77,16 @@ export default function CustomerApp() {
       <aside className="cart-sidebar">
         <div className="cart-sidebar-inner">
           <div className="section-label" style={{ marginTop: 0 }}>Your order</div>
-          <CartView onCheckout={() => setCheckoutOpen(true)} onEditLine={startEditLine} />
+          {/* Once an order's just been placed, the cart is (correctly)
+              cleared — but showing "cart's empty!" in this always-visible
+              sidebar right next to a checkout/payment confirmation reads as
+              a contradiction ("did my order go through or not?"). Swap in a
+              neutral message for that narrow window instead. */}
+          {cart.length === 0 && (checkoutOpen || confirmationActive) ? (
+            <div className="empty-state" style={{ padding: '20px 10px' }}>🎉 Order confirmed — see the confirmation for details.</div>
+          ) : (
+            <CartView onCheckout={() => setCheckoutOpen(true)} onEditLine={startEditLine} />
+          )}
         </div>
       </aside>
 

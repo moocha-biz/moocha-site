@@ -142,10 +142,10 @@ export default function CheckoutSheet({ onClose }) {
           🎁 1 free drink applied from your stamp card
         </div>
       )}
-      <div className="field"><label>Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>
-      <div className="field"><label>Phone number</label><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="9XXX XXXX" inputMode="tel" /></div>
-      {!isFreeOrder && <div className="field"><label>Email (optional, for receipt)</label><input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" type="email" /></div>}
-      <div className="field"><label>Notes (optional)</label><textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. allergies, pickup time" /></div>
+      <div className="field"><label htmlFor="checkout-name">Name</label><input id="checkout-name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>
+      <div className="field"><label htmlFor="checkout-phone">Phone number</label><input id="checkout-phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="9XXX XXXX" inputMode="tel" /></div>
+      {!isFreeOrder && <div className="field"><label htmlFor="checkout-email">Email (optional, for receipt)</label><input id="checkout-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" type="email" /></div>}
+      <div className="field"><label htmlFor="checkout-notes">Notes (optional)</label><textarea id="checkout-notes" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. allergies, pickup time" /></div>
       <div className="summary-row total" style={{ marginBottom: 14 }}><span>Total</span><span>{money(cartTotalAfterRedeem)}</span></div>
       <button className="btn-primary" disabled={busy || !sb} onClick={startPayNowCheckout}>
         <span>{isFreeOrder ? 'Place order' : 'Pay with PayNow'}</span><span>{money(cartTotalAfterRedeem)}</span>

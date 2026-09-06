@@ -83,10 +83,11 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
       </div>
 
       <div className="field">
-        <label>Set exact stamp count (goal: {STAMP_GOAL})</label>
+        <label htmlFor="customer-stamp-count">Set exact stamp count (goal: {STAMP_GOAL})</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button type="button" className="mini-btn" disabled={(parseInt(stampInput, 10) || 0) <= 0} onClick={() => nudgeStamps(-1)}>−</button>
           <input
+            id="customer-stamp-count"
             type="number" min={0} max={STAMP_GOAL} style={{ flex: 1, textAlign: 'center' }} value={stampInput}
             onChange={e => {
               const raw = e.target.value;
