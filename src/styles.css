@@ -167,10 +167,14 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .empty-state{ text-align:center; padding:40px 20px; color:var(--brand);}
 .empty-state .heading{ font-size:19px; color:var(--green-dark); margin-bottom:6px;}
 
-.stamp-card-flip{ perspective:1400px; cursor:pointer; }
+.stamp-card-flip{ -webkit-perspective:1400px; perspective:1400px; cursor:pointer; }
 .stamp-card-flip:focus-visible{ outline:3px solid var(--green); outline-offset:3px; border-radius:28px; }
-.stamp-card-flip-inner{ position:relative; width:100%; aspect-ratio:1531/1080; transform-style:preserve-3d; transition:transform .6s cubic-bezier(.45,.05,.15,1); }
-.stamp-card-flip.flipped .stamp-card-flip-inner{ transform:rotateY(180deg); }
+/* iOS Safari still needs the -webkit- prefix on transform-style to actually
+   keep this 3D context (without it, preserve-3d silently falls back to
+   flat, which collapses each face's own rotateY into a plain horizontal
+   mirror instead of hiding it — the mirrored-text bug on the flip). */
+.stamp-card-flip-inner{ position:relative; width:100%; aspect-ratio:1531/1080; -webkit-transform-style:preserve-3d; transform-style:preserve-3d; transition:transform .6s cubic-bezier(.45,.05,.15,1); }
+.stamp-card-flip.flipped .stamp-card-flip-inner{ -webkit-transform:rotateY(180deg); transform:rotateY(180deg); }
 .stamp-card-static{ position:relative; width:100%; aspect-ratio:1531/1080; }
 .stamp-card-face{ position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden; }
 .stamp-card-static .stamp-card-face{ position:relative; inset:auto; width:100%; height:100%; }
@@ -191,7 +195,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .stamp-card-wordmark{ position:absolute; left:12.3%; top:39.5%; width:67.5%; z-index:1; pointer-events:none;}
 .stamp-card-star-deco{ position:absolute; top:15.4%; right:4.7%; width:32.9%; pointer-events:none; z-index:1;}
 
-.stamp-card-back{ transform:rotateY(180deg); }
+.stamp-card-back{ -webkit-transform:rotateY(180deg); transform:rotateY(180deg); }
 .stamp-card-back .stamp-card-face-inner{ background:var(--card-yellow); }
 .stamp-card-static .stamp-card-back{ transform:none; }
 .stamp-card-headline{ position:absolute; left:26%; top:14%; width:48.9%; z-index:1; pointer-events:none;}
