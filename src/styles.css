@@ -313,7 +313,6 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
     font-weight:700; font-size:14.5px; padding:8px 16px; border-radius:999px; cursor:pointer;
   }
   .desktop-nav button.active{ background:var(--mint); color:var(--green-dark); }
-  .desktop-nav-cart{ margin-left:auto; background:var(--green) !important; color:#fff !important; }
 
   /* On desktop the Cart tab view isn't needed since the sidebar is always visible */
   .mobile-only-cart{ display:none; }

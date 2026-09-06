@@ -98,8 +98,8 @@ export default function SettingsTab() {
           </div>
         )}
         <div className="field" style={{ marginTop: 10 }}>
-          <label>Auto-close preorders at</label>
-          <input type="datetime-local" value={closeAt} onChange={e => setCloseAt(e.target.value)} />
+          <label htmlFor="settings-auto-close">Auto-close preorders at</label>
+          <input id="settings-auto-close" type="datetime-local" value={closeAt} onChange={e => setCloseAt(e.target.value)} />
         </div>
         <div className="section-note" style={{ marginTop: -6 }}>Orders close on their own at this time — no need to remember to flip the toggle above. Leave blank and save to remove the cutoff.</div>
         <button className="btn-secondary" style={{ marginBottom: 0 }} disabled={!autoCloseDirty} onClick={saveAutoClose}>{closeAt ? 'Save auto-close time' : 'Clear auto-close time'}</button>
@@ -107,8 +107,8 @@ export default function SettingsTab() {
 
       <div className="settings-section">
         <div className="section-label" style={{ marginTop: 0 }}>Stall info</div>
-        <div className="field"><label>PayNow number</label><input value={phone} onChange={e => setPhone(e.target.value)} /></div>
-        <div className="field" style={{ marginBottom: 0 }}><label>Stall name (shown on QR)</label><input value={name} onChange={e => setName(e.target.value)} /></div>
+        <div className="field"><label htmlFor="settings-paynow">PayNow number</label><input id="settings-paynow" value={phone} onChange={e => setPhone(e.target.value)} /></div>
+        <div className="field" style={{ marginBottom: 0 }}><label htmlFor="settings-stall-name">Stall name (shown on QR)</label><input id="settings-stall-name" value={name} onChange={e => setName(e.target.value)} /></div>
         <button className="btn-primary" style={{ marginTop: 14 }} disabled={!stallInfoDirty} onClick={saveSettings}><span>Save settings</span><span>→</span></button>
         {!sb && <div className="demo-banner" style={{ marginTop: 14, marginBottom: 0 }}>Connect Supabase (see README.md) to make this real across every device.</div>}
       </div>
@@ -116,23 +116,23 @@ export default function SettingsTab() {
       <div className="settings-section">
         <div className="section-label" style={{ marginTop: 0 }}>Collection hours</div>
         <div className="section-note">Shown to customers so they know when to pick up this week's preorders. Saving this also resets every item's sold-this-week counts to 0.</div>
-        <div className="field"><label>Collection starts</label><input type="datetime-local" value={collectionStart} onChange={e => setCollectionStart(e.target.value)} /></div>
-        <div className="field" style={{ marginBottom: 0 }}><label>Collection ends</label><input type="datetime-local" value={collectionEnd} onChange={e => setCollectionEnd(e.target.value)} /></div>
+        <div className="field"><label htmlFor="settings-collection-start">Collection starts</label><input id="settings-collection-start" type="datetime-local" value={collectionStart} onChange={e => setCollectionStart(e.target.value)} /></div>
+        <div className="field" style={{ marginBottom: 0 }}><label htmlFor="settings-collection-end">Collection ends</label><input id="settings-collection-end" type="datetime-local" value={collectionEnd} onChange={e => setCollectionEnd(e.target.value)} /></div>
         <button className="btn-primary" style={{ marginTop: 14 }} disabled={!collectionHoursDirty} onClick={saveCollectionHours}><span>Save collection hours</span><span>→</span></button>
       </div>
 
       <div className="settings-section" style={{ marginBottom: 0 }}>
         <div className="section-label" style={{ marginTop: 0 }}>Your password</div>
         <div className="section-note">
-          {staffEmail ? `Changes the password for your own login (${staffEmail}) — no one else's.` : 'Changes the password for your own login only — no one else\'s.'}
+          {staffEmail ? `Changes the password for your own login (${staffEmail}) — no one else's.` : 'This is a shared passphrase for all staff — changing it changes it for everyone.'}
         </div>
         <div className="field">
-          <label>New password</label>
-          <input type={ppVisible ? 'text' : 'password'} value={ppNew} onChange={e => setPpNew(e.target.value)} />
+          <label htmlFor="settings-new-password">New password</label>
+          <input id="settings-new-password" type={ppVisible ? 'text' : 'password'} value={ppNew} onChange={e => setPpNew(e.target.value)} />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label>Confirm new password</label>
-          <input type={ppVisible ? 'text' : 'password'} value={ppConfirm} onChange={e => setPpConfirm(e.target.value)} />
+          <label htmlFor="settings-confirm-password">Confirm new password</label>
+          <input id="settings-confirm-password" type={ppVisible ? 'text' : 'password'} value={ppConfirm} onChange={e => setPpConfirm(e.target.value)} />
         </div>
         <div style={{ textAlign: 'right', marginTop: 6 }}>
           <span className="edit-link" onClick={() => setPpVisible(v => !v)}>{ppVisible ? 'Hide' : 'Show'} passwords</span>

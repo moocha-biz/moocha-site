@@ -88,8 +88,8 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
       <div className="sheet-title">New walk-in order</div>
       <div className="sheet-sub">Logged as Received — mark it collected once handed over to award the stamp.</div>
 
-      <div className="field"><label>Customer name (optional)</label><input value={name} onChange={e => setName(e.target.value)} /></div>
-      <div className="field"><label>Phone (optional — needed for a stamp)</label><input value={phone} onChange={e => { setPhone(e.target.value); setRedeemKey(null); }} inputMode="tel" /></div>
+      <div className="field"><label htmlFor="walkin-name">Customer name (optional)</label><input id="walkin-name" value={name} onChange={e => setName(e.target.value)} /></div>
+      <div className="field"><label htmlFor="walkin-phone">Phone (optional — needed for a stamp)</label><input id="walkin-phone" value={phone} onChange={e => { setPhone(e.target.value); setRedeemKey(null); }} inputMode="tel" /></div>
       {canRedeem && (
         <div className="section-note" style={{ marginTop: -8, marginBottom: 12, color: 'var(--green-dark)', fontWeight: 800 }}>
           🎁 {customerStamps} stamps — eligible for a free drink! Tap "make 1 free" on a line below.
@@ -155,7 +155,7 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
         </>
       )}
 
-      <div className="field" style={{ marginTop: 16 }}><label>Notes (optional)</label><textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} /></div>
+      <div className="field" style={{ marginTop: 16 }}><label htmlFor="walkin-notes">Notes (optional)</label><textarea id="walkin-notes" rows={2} value={notes} onChange={e => setNotes(e.target.value)} /></div>
 
       {/* Sticky rather than sitting after the item list — with a full menu
           above it, staff would otherwise have to scroll past every drink

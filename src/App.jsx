@@ -65,10 +65,10 @@ export default function App() {
             </Suspense>
           }
         />
-        <Route path="/" element={<CustomerApp />} />
-        <Route path="/menu" element={<CustomerApp />} />
-        <Route path="/cart" element={<CustomerApp />} />
-        <Route path="/rewards" element={<CustomerApp />} />
+        <Route path="/" element={<CustomerApp confirmationActive={!!paymentResult} />} />
+        <Route path="/menu" element={<CustomerApp confirmationActive={!!paymentResult} />} />
+        <Route path="/cart" element={<CustomerApp confirmationActive={!!paymentResult} />} />
+        <Route path="/rewards" element={<CustomerApp confirmationActive={!!paymentResult} />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <Overlay show={!!paymentResult} onClose={() => setPaymentResult(null)} center cardModal>
