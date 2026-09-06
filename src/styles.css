@@ -88,7 +88,11 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
    below the fold. dvh tracks the real visible viewport instead. */
 .sheet{ background:var(--cream2); width:100%; max-width:460px; border-radius:32px 32px 0 0; max-height:88vh; max-height:88dvh; overflow-y:auto; overflow-x:hidden; padding:20px 20px 30px 20px; animation: sheetup .22s ease; scrollbar-width:none;}
 .sheet::-webkit-scrollbar{ display:none;}
-.sheet.card-modal{ border-radius:28px; margin:0 20px; max-height:82vh; max-height:82dvh;}
+/* .sheet sets width:100% for the plain bottom-sheet case — adding a side
+   margin here without shrinking that width would render this 40px wider
+   than its container (100% plus 20px on each side), overflowing off both
+   edges instead of sitting centered with a gap. */
+.sheet.card-modal{ width:calc(100% - 40px); border-radius:28px; margin:0 20px; max-height:82vh; max-height:82dvh;}
 /* ItemSheet on a phone: a content-sized bottom sheet left it looking like
    it only covered half the screen whenever the drink had few options
    (nothing to fill the space below "Add to cart"). Below the tablet
