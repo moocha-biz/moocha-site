@@ -15,8 +15,14 @@
 // Then in the Stripe Dashboard, add a webhook endpoint pointing to:
 //   https://<your-project-ref>.supabase.co/functions/v1/stripe-webhook
 // listening for these events:
-//   - checkout.session.completed  (payment succeeded)
-//   - checkout.session.expired    (PayNow QR timed out / was abandoned)
+//   - checkout.session.completed         (customer finished checkout — for
+//                                          PayNow this fires before payment
+//                                          actually clears, so it only books
+//                                          the order here if payment_status
+//                                          is already "paid")
+//   - checkout.session.async_payment_succeeded  (PayNow payment confirmed)
+//   - checkout.session.async_payment_failed     (PayNow payment declined/failed)
+//   - checkout.session.expired           (PayNow QR timed out / was abandoned)
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import Stripe from "https://esm.sh/stripe@14?target=deno";
@@ -53,9 +59,8 @@ Deno.serve(async (req) => {
     return new Response(`Webhook signature error: ${err}`, { status: 400 });
   }
 
-  if (event.type === "checkout.session.completed") {
-    // deno-lint-ignore no-explicit-any
-    const session = event.data.object as any;
+  // deno-lint-ignore no-explicit-any
+  async function bookPaidOrder(session: any) {
     const meta = session.metadata || {};
     const items = parseItems(meta.items);
 
@@ -79,37 +84,78 @@ Deno.serve(async (req) => {
       // critically, we must NOT re-run the stock booking below for it,
       // or the same paid order would get double-counted against stock.
       console.error("Order insert skipped (likely a duplicate webhook delivery):", error);
-    } else {
-      // Books this order's items against each item's preorder stock
-      // counter. Only reached on a genuine first-time insert. The loyalty
-      // stamp is no longer given here — it's only awarded when staff mark
-      // the order collected (mark_order_collected), since a paid preorder
-      // isn't picked up yet at this point.
-      const { error: stockError } = await supabase.rpc("record_preorder_sale", { p_items: items });
-      if (stockError) console.error("Failed to record preorder stock:", stockError);
+      return;
+    }
 
-      // Mint (once) the per-customer secret that get_my_stamps/get_my_orders
-      // require alongside a phone number — a phone number alone is
-      // brute-forceable, so without this any 8-digit SG mobile number could
-      // be used to read someone else's order history. This only ever runs
-      // for a genuinely paid order, and the token is only ever handed back
-      // once, inside this order's own receipt (get_order_receipt).
-      const phone = meta.phone || "";
-      if (phone) {
-        const { data: existing } = await supabase
-          .from("customers")
-          .select("access_token")
-          .eq("phone", phone)
-          .maybeSingle();
-        if (!existing) {
-          await supabase.from("customers").insert({
-            phone, name: meta.name || "", stamps: 0, access_token: crypto.randomUUID(),
-          });
-        } else if (!existing.access_token) {
-          await supabase.from("customers").update({ access_token: crypto.randomUUID() }).eq("phone", phone);
-        }
+    // Books this order's items against each item's preorder stock
+    // counter. Only reached on a genuine first-time insert. The loyalty
+    // stamp is no longer given here — it's only awarded when staff mark
+    // the order collected (mark_order_collected), since a paid preorder
+    // isn't picked up yet at this point.
+    const { error: stockError } = await supabase.rpc("record_preorder_sale", { p_items: items });
+    if (stockError) console.error("Failed to record preorder stock:", stockError);
+
+    // Mint (once) the per-customer secret that get_my_stamps/get_my_orders
+    // require alongside a phone number — a phone number alone is
+    // brute-forceable, so without this any 8-digit SG mobile number could
+    // be used to read someone else's order history. This only ever runs
+    // for a genuinely paid order, and the token is only ever handed back
+    // once, inside this order's own receipt (get_order_receipt).
+    const phone = meta.phone || "";
+    if (phone) {
+      const { data: existing } = await supabase
+        .from("customers")
+        .select("access_token")
+        .eq("phone", phone)
+        .maybeSingle();
+      if (!existing) {
+        await supabase.from("customers").insert({
+          phone, name: meta.name || "", stamps: 0, access_token: crypto.randomUUID(),
+        });
+      } else if (!existing.access_token) {
+        await supabase.from("customers").update({ access_token: crypto.randomUUID() }).eq("phone", phone);
       }
     }
+  }
+
+  // deno-lint-ignore no-explicit-any
+  async function recordFailedOrder(session: any, status: string) {
+    const meta = session.metadata || {};
+    if (!meta.order_id) return;
+    const { error } = await supabase.from("orders").insert({
+      id: meta.order_id,
+      name: meta.name || "",
+      phone: meta.phone || "",
+      date: new Date().toISOString(),
+      items: parseItems(meta.items),
+      total: (session.amount_total || 0) / 100,
+      notes: meta.notes || "",
+      status,
+      stripe_session_id: session.id,
+    });
+    if (error) console.error(`Failed to record ${status} checkout session:`, error);
+  }
+
+  if (event.type === "checkout.session.completed") {
+    // deno-lint-ignore no-explicit-any
+    const session = event.data.object as any;
+    // PayNow is an async payment method: this event fires the instant the
+    // customer finishes the checkout form, before the QR is actually paid.
+    // payment_status is only "paid" here for payment methods that clear
+    // immediately (e.g. cards). For PayNow, wait for
+    // checkout.session.async_payment_succeeded instead.
+    if (session.payment_status === "paid") {
+      await bookPaidOrder(session);
+    }
+  } else if (event.type === "checkout.session.async_payment_succeeded") {
+    // deno-lint-ignore no-explicit-any
+    const session = event.data.object as any;
+    await bookPaidOrder(session);
+  } else if (event.type === "checkout.session.async_payment_failed") {
+    // The PayNow payment was declined/failed (distinct from timing out).
+    // deno-lint-ignore no-explicit-any
+    const session = event.data.object as any;
+    await recordFailedOrder(session, "Payment failed");
   } else if (event.type === "checkout.session.expired") {
     // The PayNow QR timed out (or the customer closed the tab) before
     // paying. Nothing was ever written for this order, so record it as a
@@ -117,21 +163,7 @@ Deno.serve(async (req) => {
     // vanishing silently, and staff can follow up if needed.
     // deno-lint-ignore no-explicit-any
     const session = event.data.object as any;
-    const meta = session.metadata || {};
-    if (meta.order_id) {
-      const { error } = await supabase.from("orders").insert({
-        id: meta.order_id,
-        name: meta.name || "",
-        phone: meta.phone || "",
-        date: new Date().toISOString(),
-        items: parseItems(meta.items),
-        total: (session.amount_total || 0) / 100,
-        notes: meta.notes || "",
-        status: "Payment failed",
-        stripe_session_id: session.id,
-      });
-      if (error) console.error("Failed to record expired checkout session:", error);
-    }
+    await recordFailedOrder(session, "Payment failed");
   }
 
   return new Response(JSON.stringify({ received: true }), {
