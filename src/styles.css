@@ -30,6 +30,8 @@ header{ padding:22px 20px 8px 20px; display:flex; align-items:center; justify-co
 .header-logo{ height:44px; width:auto; display:block; margin-left:-2px;}
 .brand-name{ font-family:'Baloo 2'; font-weight:800; font-size:26px; color:var(--green-dark); line-height:1;}
 .brand-sub{ font-size:11px; color:var(--brand); font-weight:500; opacity:0.75; margin-top:2px;}
+.header-social{ width:38px; height:38px; border-radius:50%; background:var(--mint); color:var(--green-dark); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 0 var(--mint-deep); flex-shrink:0;}
+.header-social:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--mint-deep);}
 
 .desktop-nav{ display:none; }
 
