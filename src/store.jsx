@@ -502,12 +502,16 @@ export function MoochaProvider({ children }) {
           }
         }
       }
-      const next = prev.map(l => {
-        if (l.lineId !== lineId) return l;
-        const unit = l.lineTotal / l.qty;
-        const qty = Math.max(1, l.qty + d);
-        return { ...l, qty, lineTotal: unit * qty };
-      });
+      // Decrementing past 1 drops the line entirely, same as tapping Remove —
+      // otherwise the stepper gets stuck at qty 1 with no way to zero it out.
+      const newQty = line.qty + d;
+      const next = newQty <= 0
+        ? prev.filter(l => l.lineId !== lineId)
+        : prev.map(l => {
+          if (l.lineId !== lineId) return l;
+          const unit = l.lineTotal / l.qty;
+          return { ...l, qty: newQty, lineTotal: unit * newQty };
+        });
       saveCartLocal(next);
       return next;
     });
@@ -515,6 +519,13 @@ export function MoochaProvider({ children }) {
 
   const updateLine = useCallback((lineId, patch) => {
     setCart(prev => {
+      // A patch that zeroes (or negates) qty means "remove", not "write a
+      // dead 0-qty line into the cart".
+      if (patch.qty != null && patch.qty <= 0) {
+        const next = prev.filter(l => l.lineId !== lineId);
+        saveCartLocal(next);
+        return next;
+      }
       const next = prev.map(l => (l.lineId === lineId ? { ...l, ...patch, lineId } : l));
       saveCartLocal(next);
       return next;
@@ -533,6 +544,46 @@ export function MoochaProvider({ children }) {
     setCart([]);
     saveCartLocal([]);
   }, [saveCartLocal]);
+
+  // The menu (and its preorderLimit/preorderSold) refreshes on its own
+  // polling cycle, independent of the cart — so if staff lower a limit (or
+  // stock sells out) after a customer already added more than the new
+  // remaining amount, nothing else ever revisits that stale cart quantity.
+  // This clamps every line back down to what's actually still available,
+  // dropping lines that no longer fit at all.
+  useEffect(() => {
+    setCart(prev => {
+      if (prev.length === 0) return prev;
+      const items = Object.values(menu.categories).flat();
+      const byItemId = {};
+      prev.forEach(l => { (byItemId[l.itemId] ||= []).push(l); });
+      let changed = false;
+      let next = prev.map(l => ({ ...l }));
+      for (const itemId in byItemId) {
+        const item = items.find(i => String(i.id) === String(itemId));
+        if (!item || item.preorderLimit == null) continue;
+        const remaining = Math.max(0, item.preorderLimit - (item.preorderSold || 0));
+        const lines = next.filter(l => l.itemId === (item.id));
+        const total = lines.reduce((s, l) => s + l.qty, 0);
+        if (total <= remaining) continue;
+        changed = true;
+        let toCut = total - remaining;
+        for (const line of [...lines].sort((a, b) => b.qty - a.qty)) {
+          if (toCut <= 0) break;
+          const cut = Math.min(line.qty, toCut);
+          const unit = line.lineTotal / line.qty;
+          line.qty -= cut;
+          line.lineTotal = unit * line.qty;
+          toCut -= cut;
+        }
+      }
+      if (!changed) return prev;
+      next = next.filter(l => l.qty > 0);
+      saveCartLocal(next);
+      showToast('Some items in your cart were reduced — stock limit changed');
+      return next;
+    });
+  }, [menu, saveCartLocal, showToast]);
 
   // ---------------- initial + polling load ----------------
   // Deliberately doesn't fetch orders — that table is staff-only now, so
