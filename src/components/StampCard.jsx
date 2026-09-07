@@ -10,7 +10,7 @@ export default function StampCard({ stamps, flipEnabled = true, rewardMessage })
   // horizontally, swaps which face is mounted at the midpoint, then
   // un-squishes — same "flip" feel, nothing for a browser's 3D transform
   // support to get wrong.
-  const [showFront, setShowFront] = useState(false);
+  const [showFront, setShowFront] = useState(true);
   const [flipping, setFlipping] = useState(false);
   const totalStamps = stamps || 0;
   const progress = totalStamps > 0 && totalStamps % STAMP_GOAL === 0 ? STAMP_GOAL : totalStamps % STAMP_GOAL;
