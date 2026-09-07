@@ -198,20 +198,25 @@ Deno.serve(async (req) => {
     }
 
     const trimmedEmail = String(email || "").trim();
+    // Stripe's hosted Checkout page always requires an email in payment
+    // mode — there's no way to disable that field — so it's enforced here
+    // too, matching the (now-required) field in the checkout form.
+    if (!trimmedEmail) {
+      return new Response(JSON.stringify({ error: "Email is required for checkout" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // `customer_email` only sets the email on the Customer record created
     // *after* payment — it doesn't prefill the visible email field on the
     // hosted Checkout page, so customers were being asked to type it again.
     // An actual Customer with an email already set does prefill (and lock)
     // that field, per Stripe's docs.
-    let customerId: string | undefined;
-    if (trimmedEmail) {
-      const customer = await stripe.customers.create(
-        { email: trimmedEmail, name: String(name || "").slice(0, 250) },
-        { idempotencyKey: `customer-${orderId}` }
-      );
-      customerId = customer.id;
-    }
+    const customer = await stripe.customers.create(
+      { email: trimmedEmail, name: String(name || "").slice(0, 250) },
+      { idempotencyKey: `customer-${orderId}` }
+    );
 
     const session = await stripe.checkout.sessions.create(
       {
@@ -229,8 +234,8 @@ Deno.serve(async (req) => {
           // client payload, so the order record can't be forged either.
           items: JSON.stringify(metaItems).slice(0, 480),
         },
-        ...(customerId ? { customer: customerId } : {}),
-        ...(trimmedEmail ? { payment_intent_data: { receipt_email: trimmedEmail } } : {}),
+        customer: customer.id,
+        payment_intent_data: { receipt_email: trimmedEmail },
         success_url: successUrl,
         cancel_url: cancelUrl,
       },

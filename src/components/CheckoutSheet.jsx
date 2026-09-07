@@ -55,6 +55,11 @@ export default function CheckoutSheet({ onClose }) {
 
   const startPayNowCheckout = async () => {
     if (!name.trim() || !phone.trim()) { showToast('Fill in your name and phone number 🙏'); return; }
+    // Stripe's hosted Checkout page always requires an email address in
+    // payment mode — there's no option to make it optional there — so it
+    // must be required here too, or customers who skip it get stuck
+    // re-entering it as "required" on a page they didn't expect to ask.
+    if (!isFreeOrder && !email.trim()) { showToast('Add your email for the receipt 🙏'); return; }
     // Catches a typo before it becomes an order that's unrecoverable from
     // My Rewards — an unnormalized/malformed phone here would silently
     // fragment this customer's stamp card into two different records
@@ -147,7 +152,7 @@ export default function CheckoutSheet({ onClose }) {
       )}
       <div className="field"><label htmlFor="checkout-name">Name</label><input id="checkout-name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>
       <div className="field"><label htmlFor="checkout-phone">Phone number</label><input id="checkout-phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="9XXX XXXX" inputMode="tel" /></div>
-      {!isFreeOrder && <div className="field"><label htmlFor="checkout-email">Email (optional, for receipt)</label><input id="checkout-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" type="email" /></div>}
+      {!isFreeOrder && <div className="field"><label htmlFor="checkout-email">Email (for receipt)</label><input id="checkout-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" type="email" required /></div>}
       <div className="field"><label htmlFor="checkout-notes">Notes (optional)</label><textarea id="checkout-notes" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. allergies, pickup time" /></div>
       <div className="summary-row total" style={{ marginBottom: 14 }}><span>Total</span><span>{money(cartTotalAfterRedeem)}</span></div>
       <button className="btn-primary" disabled={busy || !sb} onClick={startPayNowCheckout}>
