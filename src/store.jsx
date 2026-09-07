@@ -93,6 +93,7 @@ export function MoochaProvider({ children }) {
       id: r.id, name: r.name, phone: r.phone, date: r.date, items: r.items, total: Number(r.total), notes: r.notes,
       status: r.status, orderType: r.order_type, collectedAt: r.collected_at, collectedBy: r.collected_by,
       stripeSessionId: r.stripe_session_id, refundedAt: r.refunded_at, refundedBy: r.refunded_by, refundId: r.refund_id,
+      stockAlert: r.stock_alert,
     }));
   }, [noteSupabaseError]);
 

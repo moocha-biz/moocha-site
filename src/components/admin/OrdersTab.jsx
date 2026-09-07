@@ -124,6 +124,11 @@ export default function OrdersTab() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand)' }}>{o.orderType === 'walkin' ? '🚶 Walk-in' : '📦 Preorder'}</span>
               <StatusBadge status={o.status} />
+              {o.stockAlert && (
+                <span title="This order was booked past the item's stock limit — likely oversold from concurrent checkouts. Review and consider a refund." style={{ fontSize: 11, fontWeight: 700, color: 'var(--sun-deep)' }}>
+                  ⚠️ Oversold
+                </span>
+              )}
             </div>
           </div>
           <div className="order-row-right">

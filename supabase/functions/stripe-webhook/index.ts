@@ -92,8 +92,21 @@ Deno.serve(async (req) => {
     // stamp is no longer given here — it's only awarded when staff mark
     // the order collected (mark_order_collected), since a paid preorder
     // isn't picked up yet at this point.
-    const { error: stockError } = await supabase.rpc("record_preorder_sale", { p_items: items });
-    if (stockError) console.error("Failed to record preorder stock:", stockError);
+    //
+    // The limit was already checked before payment (create-checkout-session),
+    // but PayNow settlement is async and can take minutes, so enough
+    // concurrent checkouts for the last few units can all pass that check
+    // and all land here. record_preorder_sale locks each item row and
+    // hands back which items (if any) this booking pushed over their
+    // limit — since the order's already paid, it can't be rejected, so
+    // it's flagged on the order instead for staff to catch and follow up.
+    const { data: alerts, error: stockError } = await supabase.rpc("record_preorder_sale", { p_items: items });
+    if (stockError) {
+      console.error("Failed to record preorder stock:", stockError);
+    } else if (Array.isArray(alerts) && alerts.length > 0) {
+      console.warn("Preorder oversold:", meta.order_id, alerts);
+      await supabase.from("orders").update({ stock_alert: JSON.stringify(alerts) }).eq("id", meta.order_id || session.id);
+    }
 
     // Mint (once) the per-customer secret that get_my_stamps/get_my_orders
     // require alongside a phone number — a phone number alone is
