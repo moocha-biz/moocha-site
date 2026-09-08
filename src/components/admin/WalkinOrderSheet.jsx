@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import QRCode from 'qrcode';
 import { useMoocha, DEFAULT_SUGAR_LEVELS, STAMP_GOAL } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
+import { buildPayNowPayload } from '../../lib/paynow.js';
 
 export default function WalkinOrderSheet({ onClose, onLogged }) {
   const { menu, customers, logWalkinOrder, showToast } = useMoocha();
@@ -14,6 +16,8 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [busyQr, setBusyQr] = useState(false);
 
   const allItems = Object.values(menu.categories).flat().filter(i => !i.isHidden);
   const itemById = Object.fromEntries(allItems.map(i => [i.id, i]));
@@ -68,6 +72,24 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
     return { itemId: l.itemId, name: l.name, sugar: l.sugar, qty: l.qty, lineTotal: l.price * paidQty, ...(isRedeemed ? { redeemed: true } : {}) };
   });
   const total = lines.reduce((s, l) => s + l.lineTotal, 0);
+
+  // A stale QR would show a stamped-in amount that no longer matches the
+  // cart — safer to drop it the moment anything changes than to risk
+  // staff showing a QR for the wrong total.
+  if (qrDataUrl && total !== qrDataUrl.forTotal) setQrDataUrl(null);
+
+  const showPaynowQr = async () => {
+    if (total <= 0) { showToast('Add at least one item'); return; }
+    setBusyQr(true);
+    const payload = buildPayNowPayload({ amount: total, reference: 'W' + Date.now() });
+    try {
+      const url = await QRCode.toDataURL(payload, { margin: 1, width: 220 });
+      setQrDataUrl({ url, forTotal: total });
+    } catch {
+      showToast('Could not generate QR code');
+    }
+    setBusyQr(false);
+  };
 
   const submit = async () => {
     if (lines.length === 0) { showToast('Add at least one item'); return; }
@@ -170,6 +192,17 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
         background: 'var(--cream2)', padding: '14px 20px 30px 20px', boxShadow: '0 -6px 14px -10px rgba(0,0,0,0.25)',
       }}>
         <div className="summary-row total" style={{ marginBottom: 12 }}><span>Total</span><span>{money(total)}</span></div>
+        {qrDataUrl ? (
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <img src={qrDataUrl.url} alt="PayNow QR code" width={220} height={220} style={{ borderRadius: 12, background: '#fff' }} />
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brand)', marginTop: 6 }}>Scan to pay {money(total)} via PayNow</div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setQrDataUrl(null)}>Hide QR</span>
+          </div>
+        ) : (
+          <button className="btn-secondary" disabled={busyQr || lines.length === 0} onClick={showPaynowQr} style={{ marginBottom: 12, width: '100%' }}>
+            {busyQr ? 'Generating…' : 'Show PayNow QR'}
+          </button>
+        )}
         <button className="btn-primary" disabled={busy || lines.length === 0} onClick={submit}><span>{busy ? 'Logging…' : 'Log order'}</span><span>{money(total)}</span></button>
         <div style={{ textAlign: 'center', marginTop: 10 }}>
           <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brand)', cursor: 'pointer' }} onClick={onClose}>Cancel</span>
