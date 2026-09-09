@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import { useMoocha, DEFAULT_SUGAR_LEVELS, STAMP_GOAL } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
@@ -10,7 +10,10 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
   // levels becomes separate lines, each independently adjustable.
   const [linesByKey, setLinesByKey] = useState({});
   const [pendingSugar, setPendingSugar] = useState({});
-  const [redeemKey, setRedeemKey] = useState(null);
+  // Staff-picked free-unit counts, keyed the same as linesByKey. Clamped
+  // against each line's qty and the redemption budget below (rawFreeQtyByKey
+  // -> freeQtyByKey) so shrinking the cart never leaves a stale over-pick.
+  const [rawFreeQtyByKey, setRawFreeQtyByKey] = useState({});
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
@@ -53,23 +56,62 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
       if (cur.qty <= 1) {
         const next = { ...prev };
         delete next[key];
-        if (redeemKey === key) setRedeemKey(null);
         return next;
       }
       return { ...prev, [key]: { ...cur, qty: cur.qty - 1 } };
     });
   };
 
+  const lineEntries = Object.entries(linesByKey);
+  const cartQtyTotal = lineEntries.reduce((s, [, l]) => s + l.qty, 0);
+
   const matchedCustomer = customers.find(c => c.phone === phone.trim());
   const customerStamps = matchedCustomer?.stamps || 0;
-  const canRedeem = !!phone.trim() && customerStamps >= STAMP_GOAL;
-  const toggleRedeem = (key) => setRedeemKey(prev => prev === key ? null : key);
+  // Mirrors the online cart's crossing logic (store.jsx's totalFreeUnits) —
+  // stamps already banked plus every drink in this walk-in order itself can
+  // cross STAMP_GOAL, possibly more than once on a big order.
+  const totalFreeUnits = !!phone.trim() && cartQtyTotal > 0
+    ? Math.min(Math.floor((customerStamps + cartQtyTotal) / STAMP_GOAL), cartQtyTotal)
+    : 0;
+  const canRedeem = totalFreeUnits > 0;
 
-  const lineEntries = Object.entries(linesByKey);
+  // Clamp staff picks to each line's current qty and to the redemption
+  // budget, in that order, so a cart that shrank after picks were made
+  // never over-claims free units.
+  const freeQtyByKey = useMemo(() => {
+    const map = {};
+    let remainingBudget = totalFreeUnits;
+    for (const [key, l] of lineEntries) {
+      if (remainingBudget <= 0) break;
+      const requested = Math.min(rawFreeQtyByKey[key] || 0, l.qty);
+      const take = Math.min(requested, remainingBudget);
+      if (take > 0) { map[key] = take; remainingBudget -= take; }
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linesByKey, rawFreeQtyByKey, totalFreeUnits]);
+  const freeUsed = Object.values(freeQtyByKey).reduce((s, n) => s + n, 0);
+  const freeRemaining = totalFreeUnits - freeUsed;
+
+  // Tapping a line cycles its free-unit count 0 -> 1 -> ... -> cap -> 0,
+  // where cap is however much of the remaining budget this line can still
+  // claim (its own current pick included, so cycling back down releases
+  // budget for other lines).
+  const cycleFree = (key, lineQty) => {
+    setRawFreeQtyByKey(prev => {
+      const cur = prev[key] || 0;
+      const cap = Math.min(lineQty, freeRemaining + cur);
+      const next = cur >= cap ? 0 : cur + 1;
+      const copy = { ...prev };
+      if (next === 0) delete copy[key]; else copy[key] = next;
+      return copy;
+    });
+  };
+
   const lines = lineEntries.map(([key, l]) => {
-    const isRedeemed = canRedeem && redeemKey === key;
-    const paidQty = isRedeemed ? l.qty - 1 : l.qty;
-    return { itemId: l.itemId, name: l.name, sugar: l.sugar, qty: l.qty, lineTotal: l.price * paidQty, ...(isRedeemed ? { redeemed: true } : {}) };
+    const free = freeQtyByKey[key] || 0;
+    const paidQty = l.qty - free;
+    return { itemId: l.itemId, name: l.name, sugar: l.sugar, qty: l.qty, lineTotal: l.price * paidQty, ...(free > 0 ? { redeemed: true, freeQty: free } : {}) };
   });
   const total = lines.reduce((s, l) => s + l.lineTotal, 0);
 
@@ -111,10 +153,10 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
       <div className="sheet-sub">Logged as Received - mark it collected once handed over to award the stamp.</div>
 
       <div className="field"><label htmlFor="walkin-name">Customer name (optional)</label><input id="walkin-name" value={name} onChange={e => setName(e.target.value)} /></div>
-      <div className="field"><label htmlFor="walkin-phone">Phone (optional - needed for a stamp)</label><input id="walkin-phone" value={phone} onChange={e => { setPhone(e.target.value); setRedeemKey(null); }} inputMode="tel" /></div>
+      <div className="field"><label htmlFor="walkin-phone">Phone (optional - needed for a stamp)</label><input id="walkin-phone" value={phone} onChange={e => { setPhone(e.target.value); setRawFreeQtyByKey({}); }} inputMode="tel" /></div>
       {canRedeem && (
         <div className="section-note" style={{ marginTop: -8, marginBottom: 12, color: 'var(--green-dark)', fontWeight: 800 }}>
-          🎁 {customerStamps} stamps - eligible for a free drink! Tap "make 1 free" on a line below.
+          🎁 {customerStamps} stamps + {cartQtyTotal} in this order → {totalFreeUnits} free drink{totalFreeUnits > 1 ? 's' : ''}. Tap 🎁 on a line below ({freeRemaining} left to assign).
         </div>
       )}
 
@@ -163,19 +205,24 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
       {lineEntries.length > 0 && (
         <>
           <div className="section-label" style={{ marginTop: 16 }}>Order so far</div>
-          {lineEntries.map(([key, l]) => (
-            <div className="cart-line" key={key}>
-              <div className="cart-line-top"><span>{l.name} · {l.sugar}</span><span>{money(redeemKey === key ? l.price * Math.max(0, l.qty - 1) : l.price * l.qty)}</span></div>
-              <div className="cart-line-bottom">
-                <div className="mini-qty">
-                  <button className="mini-btn" onClick={() => removeUnit(key)}>−</button>
-                  <span>{l.qty}</span>
-                  <button className="mini-btn" onClick={() => addUnit(itemById[l.itemId], l.sugar)}>+</button>
+          {lineEntries.map(([key, l]) => {
+            const free = freeQtyByKey[key] || 0;
+            return (
+              <div className="cart-line" key={key}>
+                <div className="cart-line-top"><span>{l.name} · {l.sugar}</span><span>{money(l.price * (l.qty - free))}</span></div>
+                <div className="cart-line-bottom">
+                  <div className="mini-qty">
+                    <button className="mini-btn" onClick={() => removeUnit(key)}>−</button>
+                    <span>{l.qty}</span>
+                    <button className="mini-btn" onClick={() => addUnit(itemById[l.itemId], l.sugar)}>+</button>
+                  </div>
+                  {canRedeem && (free > 0 || freeRemaining > 0) && (
+                    <span className="edit-link" onClick={() => cycleFree(key, l.qty)}>{free > 0 ? `🎁 ${free} free ✓` : '🎁 make free'}</span>
+                  )}
                 </div>
-                {canRedeem && <span className="edit-link" onClick={() => toggleRedeem(key)}>{redeemKey === key ? '🎁 1 free ✓' : '🎁 make 1 free'}</span>}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </>
       )}
 
