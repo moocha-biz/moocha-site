@@ -295,9 +295,12 @@ export function MoochaProvider({ children }) {
       }
       return { notified: false };
     }
-    const { error } = await sb.rpc('mark_order_ready', { p_id: id });
+    const { data: changed, error } = await sb.rpc('mark_order_ready', { p_id: id });
     if (error) { noteSupabaseError('Marking order ready', error); return { notified: false }; }
     setOrders(await fetchOrders());
+    // Already Ready (double-click, or another staff session got there
+    // first) — nothing actually changed, so don't send a second DM.
+    if (!changed) return { notified: false };
     try {
       const { data } = await sb.functions.invoke('notify-telegram', { body: { orderId: id } });
       return { notified: !!data?.notified };

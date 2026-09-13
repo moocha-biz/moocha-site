@@ -243,7 +243,12 @@ export default function OrderDetailSheet({ order, onClose }) {
       ))}
       <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
 
-      {order.status === 'Received' && <button className="btn-primary" style={{ marginTop: 16 }} disabled={marking} onClick={ready}><span>{marking ? 'Marking ready…' : 'Mark ready'}</span><span>→</span></button>}
+      {/* Walk-ins are handed over on the spot — no gap between "made" and
+          "picked up" for the Ready step to represent — so they keep the
+          original single "Mark collected" click. Only preorders (which sit
+          around waiting for the customer to come back) go through Ready. */}
+      {order.status === 'Received' && order.orderType === 'walkin' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
+      {order.status === 'Received' && order.orderType !== 'walkin' && <button className="btn-primary" style={{ marginTop: 16 }} disabled={marking} onClick={ready}><span>{marking ? 'Marking ready…' : 'Mark ready'}</span><span>→</span></button>}
       {order.status === 'Ready' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
       {canRefund && (
         <button className="btn-secondary" style={{ marginTop: 8, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>
