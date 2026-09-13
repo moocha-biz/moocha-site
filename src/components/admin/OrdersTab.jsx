@@ -8,7 +8,7 @@ import OrderDetailSheet from './OrderDetailSheet.jsx';
 import StatusBadge from './StatusBadge.jsx';
 
 const TYPE_FILTERS = [{ key: 'all', label: 'All types' }, { key: 'preorder', label: 'Preorder' }, { key: 'walkin', label: 'Walk-in' }];
-const STATUS_FILTERS = [{ key: 'all', label: 'All statuses' }, { key: 'Received', label: 'Received' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }, { key: 'Payment failed', label: 'Payment failed' }];
+const STATUS_FILTERS = [{ key: 'all', label: 'All statuses' }, { key: 'Received', label: 'Received' }, { key: 'Ready', label: 'Ready' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }, { key: 'Payment failed', label: 'Payment failed' }];
 
 // <input type="date"> gives/wants "YYYY-MM-DD" in local time.
 function toLocalDateStr(iso) {
@@ -38,7 +38,14 @@ export default function OrdersTab() {
 
   const pendingWalkins = orders.filter(o => o.status === 'Received' && o.orderType === 'walkin').length;
   const pendingPreorders = orders.filter(o => o.status === 'Received' && o.orderType !== 'walkin').length;
-  const rowClass = (o) => o.status !== 'Received' ? '' : (o.orderType === 'walkin' ? 'pending-walkin' : 'pending-preorder');
+  const readyForPickup = orders.filter(o => o.status === 'Ready').length;
+  // Ready means "waiting on the customer", not "staff needs to act" like the
+  // Received-only pending-* highlights below, so it gets its own class.
+  const rowClass = (o) => {
+    if (o.status === 'Ready') return 'ready-pickup';
+    if (o.status !== 'Received') return '';
+    return o.orderType === 'walkin' ? 'pending-walkin' : 'pending-preorder';
+  };
 
   // Exports exactly what's currently filtered/searched — "today's walk-ins"
   // or "this week's preorders" just works by filtering first, then
@@ -84,7 +91,7 @@ export default function OrdersTab() {
         <button className="btn-secondary btn-compact" disabled={filtered.length === 0} onClick={exportOrders}>⬇ Export</button>
       </div>
 
-      {(pendingWalkins > 0 || pendingPreorders > 0) && (
+      {(pendingWalkins > 0 || pendingPreorders > 0 || readyForPickup > 0) && (
         <div className="stat-grid" style={{ marginBottom: 14 }}>
           <div className="stat-card" style={{ borderLeft: '4px solid var(--sun-deep)' }}>
             <div className="stat-num">{pendingWalkins}</div>
@@ -93,6 +100,10 @@ export default function OrdersTab() {
           <div className="stat-card" style={{ borderLeft: '4px solid var(--green)' }}>
             <div className="stat-num">{pendingPreorders}</div>
             <div className="stat-label">📦 preorder{pendingPreorders === 1 ? '' : 's'} to collect</div>
+          </div>
+          <div className="stat-card" style={{ borderLeft: '4px solid var(--lilac)' }}>
+            <div className="stat-num">{readyForPickup}</div>
+            <div className="stat-label">🔔 ready for pickup</div>
           </div>
         </div>
       )}

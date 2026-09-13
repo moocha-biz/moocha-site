@@ -55,7 +55,10 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
     <>
       <div className="sheet-close" />
       <div className="sheet-title">{customer.name || '(no name)'}</div>
-      <div className="sheet-sub">{customer.phone} · {stats.count} orders · {money(stats.spend)} spent</div>
+      <div className="sheet-sub">
+        {customer.phone} · {stats.count} orders · {money(stats.spend)} spent
+        {customer.telegram_username ? ` · 🔔 @${customer.telegram_username}` : ''}
+      </div>
       <div style={{ marginBottom: 18 }}>
         <StampCard stamps={customer.stamps || 0} flipEnabled={false} rewardMessage="🎉 free drink ready to redeem" />
       </div>
