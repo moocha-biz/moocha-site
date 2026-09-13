@@ -92,6 +92,7 @@ export function MoochaProvider({ children }) {
     return data.map(r => ({
       id: r.id, name: r.name, phone: r.phone, date: r.date, items: r.items, total: Number(r.total), notes: r.notes,
       status: r.status, orderType: r.order_type, collectedAt: r.collected_at, collectedBy: r.collected_by,
+      readyAt: r.ready_at, readyBy: r.ready_by,
       stripeSessionId: r.stripe_session_id, refundedAt: r.refunded_at, refundedBy: r.refunded_by, refundId: r.refund_id,
       stockAlert: r.stock_alert,
     }));
@@ -278,6 +279,36 @@ export function MoochaProvider({ children }) {
     setCustomers(await fetchCustomers());
   }, [sb, fetchOrders, fetchCustomers, noteSupabaseError]);
 
+  // Staff mark a preorder ready for pickup. Best-effort notifies the
+  // customer over Telegram if they've linked it — an invoke failure here
+  // is swallowed, not surfaced as an error, since the status change itself
+  // already succeeded regardless of whether the DM goes out.
+  const markOrderReady = useCallback(async (id) => {
+    if (!sb) {
+      const list = getLocal('demo_orders', []);
+      const o = list.find(x => x.id === id);
+      if (o && o.status === 'Received') {
+        o.status = 'Ready';
+        o.readyAt = new Date().toISOString();
+        setLocal('demo_orders', list);
+        setOrders([...list]);
+      }
+      return { notified: false };
+    }
+    const { data: changed, error } = await sb.rpc('mark_order_ready', { p_id: id });
+    if (error) { noteSupabaseError('Marking order ready', error); return { notified: false }; }
+    setOrders(await fetchOrders());
+    // Already Ready (double-click, or another staff session got there
+    // first) — nothing actually changed, so don't send a second DM.
+    if (!changed) return { notified: false };
+    try {
+      const { data } = await sb.functions.invoke('notify-telegram', { body: { orderId: id } });
+      return { notified: !!data?.notified };
+    } catch {
+      return { notified: false };
+    }
+  }, [sb, fetchOrders, noteSupabaseError]);
+
   const deleteOrder = useCallback(async (id) => {
     if (!sb) {
       let list = getLocal('demo_orders', []);
@@ -412,6 +443,30 @@ export function MoochaProvider({ children }) {
     if (error) { noteSupabaseError('Generating claim link', error); return { error: error.message }; }
     return { code: data };
   }, [noteSupabaseError]);
+
+  // Mints a 15-minute Telegram link code for the given phone (see
+  // generate_telegram_link_code) — used by TelegramLinkPrompt from both
+  // checkout and My Rewards.
+  const requestTelegramLink = useCallback(async (phone, token) => {
+    if (!sb) return { error: "Telegram isn't set up yet - see README.md" };
+    const { data, error } = await sb.rpc('generate_telegram_link_code', { p_phone: phone, p_token: token || null });
+    if (error) {
+      const msg = error.message === 'needs_claim'
+        ? 'Order online once, or ask staff for a rewards link, before connecting Telegram'
+        : error.message === 'not_authorized'
+          ? 'This phone is already linked to a different account'
+          : error.message || "Couldn't generate a Telegram link";
+      return { error: msg };
+    }
+    return { code: data };
+  }, []);
+
+  const fetchTelegramLinkStatus = useCallback(async (phone, token) => {
+    if (!sb) return { linked: false, username: null };
+    const { data, error } = await sb.rpc('get_my_telegram_link_status', { p_phone: phone, p_token: token || null });
+    if (error) return { linked: false, username: null };
+    return data || { linked: false, username: null };
+  }, []);
 
   // Redeems a claim code from a customer's own browser (no auth needed —
   // the code itself, not a phone number, is the proof of ownership) and
@@ -672,8 +727,8 @@ export function MoochaProvider({ children }) {
     // backend actions
     fetchOrders, fetchSettings, fetchMenuData, fetchCustomers,
     menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuSaveItem,
-    persistSettings, setCollectionHours, deleteOrder, refundOrder, logWalkinOrder, markOrderCollected,
-    setCustomerStamps, deleteCustomerRecord, generateClaimLink,
+    persistSettings, setCollectionHours, deleteOrder, refundOrder, logWalkinOrder, markOrderCollected, markOrderReady,
+    setCustomerStamps, deleteCustomerRecord, generateClaimLink, requestTelegramLink, fetchTelegramLinkStatus,
     noteSupabaseError,
   };
 

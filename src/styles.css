@@ -227,6 +227,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .order-row{ background:var(--paper); border-radius:16px; padding:13px 14px; margin-bottom:9px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow); border-left:4px solid transparent;}
 .order-row.pending-walkin{ border-left-color:var(--sun-deep); background:#FFFBF0;}
 .order-row.pending-preorder{ border-left-color:var(--green); background:#F3F9F0;}
+.order-row.ready-pickup{ border-left-color:var(--lilac); background:#FDF3FE;}
 .order-row-left .oid{ font-size:11px; color:var(--brand); font-weight:700;}
 .order-row-left .oitems{ font-size:13px; font-weight:800; margin-top:2px; font-family:'Baloo 2';}
 .order-row-right{ text-align:right;}

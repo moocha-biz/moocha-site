@@ -4,6 +4,7 @@ import { money } from '../lib/storage.js';
 import { normalizeSgPhone } from '../lib/phone.js';
 import { formatCollectionWindow } from '../lib/pickup.js';
 import { fireConfetti } from './Confetti.jsx';
+import TelegramLinkPrompt from './TelegramLinkPrompt.jsx';
 
 export default function CheckoutSheet({ onClose }) {
   const {
@@ -152,6 +153,7 @@ export default function CheckoutSheet({ onClose }) {
       )}
       <div className="field"><label htmlFor="checkout-name">Name</label><input id="checkout-name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>
       <div className="field"><label htmlFor="checkout-phone">Phone number</label><input id="checkout-phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="9XXX XXXX" inputMode="tel" /></div>
+      <TelegramLinkPrompt phone={normalizeSgPhone(phone)} token={myProfile?.customerToken} />
       {!isFreeOrder && <div className="field"><label htmlFor="checkout-email">Email (for receipt)</label><input id="checkout-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" type="email" required /></div>}
       <div className="field"><label htmlFor="checkout-notes">Notes (optional)</label><textarea id="checkout-notes" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. allergies, pickup time" /></div>
       <div className="summary-row total" style={{ marginBottom: 14 }}><span>Total</span><span>{money(cartTotalAfterRedeem)}</span></div>
