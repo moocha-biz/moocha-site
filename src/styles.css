@@ -30,7 +30,6 @@ header{ padding:22px 20px 8px 20px; display:flex; align-items:center; justify-co
 .header-logo{ height:44px; width:auto; display:block; margin-left:-2px;}
 .brand-name{ font-family:'Baloo 2'; font-weight:800; font-size:26px; color:var(--green-dark); line-height:1;}
 .brand-sub{ font-size:11px; color:var(--brand); font-weight:500; opacity:0.75; margin-top:2px;}
-
 .desktop-nav{ display:none; }
 
 nav#catNav{ display:flex; gap:8px; padding:10px 20px 14px 20px; overflow-x:auto; scrollbar-width:none; position:relative; z-index:2;}
