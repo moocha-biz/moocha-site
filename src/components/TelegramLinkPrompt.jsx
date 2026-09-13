@@ -15,6 +15,7 @@ export default function TelegramLinkPrompt({ phone, token }) {
   const [status, setStatus] = useState(null); // { linked, username } | null while loading
   const [linkUrl, setLinkUrl] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const [expired, setExpired] = useState(false);
   const pollRef = useRef(null);
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function TelegramLinkPrompt({ phone, token }) {
   useEffect(() => {
     clearInterval(pollRef.current);
     setLinkUrl(null);
+    setExpired(false);
     if (!BOT_USERNAME || !phone) { setStatus(null); return; }
     let cancelled = false;
     fetchTelegramLinkStatus(phone, token).then(s => { if (!cancelled) setStatus(s); });
@@ -34,6 +36,7 @@ export default function TelegramLinkPrompt({ phone, token }) {
 
   const connect = async () => {
     setGenerating(true);
+    setExpired(false);
     const { code, error } = await requestTelegramLink(phone, token);
     setGenerating(false);
     if (error) { showToast(error); return; }
@@ -49,6 +52,8 @@ export default function TelegramLinkPrompt({ phone, token }) {
         setLinkUrl(null);
       } else if (attempts >= POLL_MAX_ATTEMPTS) {
         clearInterval(pollRef.current);
+        setLinkUrl(null);
+        setExpired(true);
       }
     }, POLL_INTERVAL_MS);
   };
@@ -65,9 +70,14 @@ export default function TelegramLinkPrompt({ phone, token }) {
 
   return (
     <div className="field">
+      {expired && (
+        <div className="sub" style={{ color: 'var(--brand)', marginBottom: 8 }}>
+          Link expired without connecting. Try again?
+        </div>
+      )}
       {!linkUrl ? (
         <button type="button" className="btn-secondary" style={{ marginBottom: 0 }} disabled={generating} onClick={connect}>
-          {generating ? 'Generating…' : '🔔 Connect Telegram'}
+          {generating ? 'Generating…' : expired ? '🔔 Connect Telegram again' : '🔔 Connect Telegram'}
         </button>
       ) : (
         <>
