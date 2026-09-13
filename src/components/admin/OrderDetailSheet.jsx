@@ -24,8 +24,13 @@ function OrderProgress({ status }) {
       </div>
     );
   }
-  const collected = status === 'Collected';
-  const steps = [{ label: 'Order placed', done: true }, { label: 'Collected', done: collected }];
+  const STEP_ORDER = { Received: 0, Ready: 1, Collected: 2 };
+  const at = STEP_ORDER[status] ?? 0;
+  const steps = [
+    { label: 'Order placed', done: at >= 0 },
+    { label: 'Ready for pickup', done: at >= 1 },
+    { label: 'Collected', done: at >= 2 },
+  ];
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', margin: '2px 0 20px 0' }}>
       {steps.map((s, i) => (
@@ -138,9 +143,18 @@ function PaymentField({ order }) {
 }
 
 export default function OrderDetailSheet({ order, onClose }) {
-  const { markOrderCollected, deleteOrder, refundOrder, showToast } = useMoocha();
+  const { markOrderCollected, markOrderReady, deleteOrder, refundOrder, showToast } = useMoocha();
   const [refunding, setRefunding] = React.useState(false);
-  const canRefund = order.status === 'Received' || order.status === 'Collected';
+  const [marking, setMarking] = React.useState(false);
+  const canRefund = order.status === 'Received' || order.status === 'Ready' || order.status === 'Collected';
+
+  const ready = async () => {
+    setMarking(true);
+    const { notified } = await markOrderReady(order.id);
+    setMarking(false);
+    showToast(notified ? 'Marked ready - customer notified on Telegram ✓' : 'Marked ready ✓');
+    onClose();
+  };
 
   const collect = async () => {
     await markOrderCollected(order.id);
@@ -188,6 +202,14 @@ export default function OrderDetailSheet({ order, onClose }) {
       </div>
 
       <div className="field">
+        <label>Ready at</label>
+        <div className="admin-item-name">
+          {order.readyAt ? new Date(order.readyAt).toLocaleString() : 'not yet ready'}
+          {order.readyBy ? ` · ${order.readyBy}` : ''}
+        </div>
+      </div>
+
+      <div className="field">
         <label>Collected at</label>
         <div className="admin-item-name">
           {order.collectedAt ? new Date(order.collectedAt).toLocaleString() : 'not yet collected'}
@@ -221,7 +243,8 @@ export default function OrderDetailSheet({ order, onClose }) {
       ))}
       <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
 
-      {order.status === 'Received' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
+      {order.status === 'Received' && <button className="btn-primary" style={{ marginTop: 16 }} disabled={marking} onClick={ready}><span>{marking ? 'Marking ready…' : 'Mark ready'}</span><span>→</span></button>}
+      {order.status === 'Ready' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
       {canRefund && (
         <button className="btn-secondary" style={{ marginTop: 8, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>
           {refunding ? 'Refunding…' : order.stripeSessionId ? 'Refund via Stripe' : isRedeemed ? 'Cancel & refund stamps' : 'Mark refunded (cash)'}

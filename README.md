@@ -112,7 +112,51 @@ Nothing in the React app needs to change for this; `CartView`/
    change its code — pushing to `main`/opening a PR does not deploy it
    automatically.
 
-## 5. Build & deploy
+## 5. Optional: Telegram "order ready" notifications
+
+Lets a customer link a Telegram account (from checkout or My Rewards) so a
+bot DMs them the moment staff mark their order ready for pickup. Two
+Supabase Edge Functions handle this — `telegram-webhook` (Telegram calls
+this directly whenever someone messages the bot; handles `/start <code>`
+by completing the link, using the same short-lived-code handshake as the
+"claim your stamps" rewards link) and `notify-telegram` (called by the
+admin dashboard right after "Mark ready"; looks up the order's phone, and
+if it's linked, sends the DM). Nothing in the React app needs to change
+beyond what's already in this repo — `CheckoutSheet`/`LoyaltyView` already
+render `TelegramLinkPrompt`, and `OrderDetailSheet`'s "Mark ready" button
+already calls `markOrderReady`, which invokes `notify-telegram` itself.
+
+1. Message [@BotFather](https://t.me/BotFather) on Telegram, run `/newbot`,
+   and note the bot token it gives you and the bot's public `@username`.
+2. Set the required secrets (same CLI setup as Part 4 above):
+   ```bash
+   supabase secrets set TELEGRAM_BOT_TOKEN=...
+   supabase secrets set TELEGRAM_WEBHOOK_SECRET=<a random string you make up>
+   ```
+3. Deploy both functions — `telegram-webhook` needs `--no-verify-jwt`
+   since Telegram's requests carry no Supabase JWT (check the Supabase
+   Dashboard's "Enforce JWT Verification" toggle on `stripe-webhook` first
+   and mirror whatever it's actually set to today):
+   ```bash
+   supabase functions deploy telegram-webhook --no-verify-jwt
+   supabase functions deploy notify-telegram
+   ```
+4. Register the webhook with Telegram, passing the same secret as
+   `secret_token`:
+   ```bash
+   curl "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+     -d "url=https://your-project-ref.supabase.co/functions/v1/telegram-webhook" \
+     -d "secret_token=<same value as TELEGRAM_WEBHOOK_SECRET>"
+   ```
+5. Add the bot's public username to `.env` (safe to expose client-side —
+   it's just the handle used to build the `t.me/<username>?start=<code>`
+   deep link):
+   ```
+   VITE_TELEGRAM_BOT_USERNAME=your_bot_username
+   ```
+6. Restart `npm run dev` (or rebuild) so Vite picks up the new env var.
+
+## 6. Build & deploy
 
 ```bash
 npm run build
