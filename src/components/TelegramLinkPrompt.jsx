@@ -24,7 +24,7 @@ export default function TelegramLinkPrompt({ phone, token }) {
   useEffect(() => {
     clearInterval(pollRef.current);
     setLinkUrl(null);
-    if (!phone) { setStatus(null); return; }
+    if (!BOT_USERNAME || !phone) { setStatus(null); return; }
     let cancelled = false;
     fetchTelegramLinkStatus(phone, token).then(s => { if (!cancelled) setStatus(s); });
     return () => { cancelled = true; };

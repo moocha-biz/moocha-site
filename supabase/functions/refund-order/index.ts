@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (order.status !== "Received" && order.status !== "Collected") {
+    if (order.status !== "Received" && order.status !== "Ready" && order.status !== "Collected") {
       return new Response(JSON.stringify({ error: `Order is "${order.status}" — nothing to refund` }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
