@@ -32,6 +32,54 @@ npm install
 npm run dev
 ```
 
+This repo is already linked to a real Supabase project (`supabase/config.toml`),
+so local dev runs against a **local copy of it** — see "Local development"
+below before you start poking at checkout, admin, or anything Supabase-backed.
+Skip straight to `npm run dev` only if you just want to look at static UI in
+demo mode (no `.env.local` — everything saved to `localStorage` instead).
+
+## Local development (against this project's Supabase)
+
+```bash
+./scripts/dev-up.sh   # starts local Supabase, edge functions, stripe listen
+npm run dev            # in another terminal
+```
+
+`dev-up.sh` starts the local Supabase Docker stack (`supabase start`), applies
+any migrations that aren't in your local DB yet, and starts
+`supabase functions serve` + `stripe listen` so Stripe-touching edge
+functions (checkout, refunds) work against Stripe **test mode** — nothing
+here ever touches prod data or live Stripe. It's idempotent, so re-run it any
+time (e.g. once the Stripe webhook secret in `supabase/.env` goes stale).
+`./scripts/dev-up.sh stop` stops just the background processes it started;
+`supabase stop` separately stops the Docker stack.
+
+Two files it reads/writes, both gitignored (copy the `.example` versions and
+fill in a Stripe **test-mode** key from
+[dashboard.stripe.com/test/apikeys](https://dashboard.stripe.com/test/apikeys)):
+
+- `.env.local` — frontend config (Vite loads this over `.env`). Copy from
+  `.env.local.example`; `dev-up.sh` keeps the Supabase URL/anon key in sync
+  automatically, but `VITE_STRIPE_PUBLISHABLE_KEY` is yours to fill in.
+- `supabase/.env` — edge function secrets (`supabase functions serve` reads
+  this). Copy from `supabase/.env.example` and fill in `STRIPE_SECRET_KEY`;
+  `dev-up.sh` fills in `STRIPE_WEBHOOK_SECRET` for you from `stripe listen`.
+
+Staff/admin login (`/admin`) needs a real Supabase Auth user, which isn't
+seeded — create one against the local stack once:
+
+```bash
+curl -X POST http://127.0.0.1:54321/auth/v1/admin/users \
+  -H "apikey: <local service_role key from `supabase status`>" \
+  -H "Authorization: Bearer <same key>" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"whatever","email_confirm":true}'
+```
+
+Telegram notifications (Part 5 below) are unconfigured locally by default —
+harmless no-op unless you add your own bot's `TELEGRAM_BOT_TOKEN` /
+`TELEGRAM_WEBHOOK_SECRET` to `supabase/.env`.
+
 ## 2. Add your images
 
 Copy your `assets/` folder (logo-cow.png, logo-full.png, item photos, etc.)
@@ -45,9 +93,10 @@ Without it, the app runs in **demo mode**: everything is saved to
 `localStorage` only on the current device/browser.
 
 1. Create a free project at https://supabase.com
-2. Run your `supabase-schema.sql` in the SQL editor (same schema as the
-   original app — orders, menu, settings, customers tables + the
-   `check_staff_pin` / `set_staff_pin` functions).
+2. Apply this repo's schema: `supabase link --project-ref your-project-ref`
+   then `supabase db push`. Staff/admin sign-in uses real Supabase Auth
+   (email + password) — create a staff user under Authentication > Users in
+   the dashboard, not a PIN/passphrase function.
 3. Create a `.env` file in the project root:
    ```
    VITE_SUPABASE_URL=https://your-project.supabase.co
