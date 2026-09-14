@@ -29,7 +29,6 @@ export default function LoyaltyView() {
 
   return (
     <>
-      {myProfile?.name && <div className="section-note" style={{ marginBottom: 0 }}>Hi, {myProfile.name}! 👋</div>}
       <div className="section-label">Your stamp card 🌿</div>
       <div className="section-note">1 stamp per drink · {STAMP_GOAL} stamps = a free drink · tap the card to flip it</div>
       <StampCard stamps={totalStamps} flipEnabled rewardMessage="🎉 free drink unlocked - mention it at pickup!" />
