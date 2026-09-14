@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMoocha } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
+import { edgeFunctionErrorMessage } from '../../lib/edgeFunctionError.js';
 import StatusBadge, { Badge } from './StatusBadge.jsx';
 
 // A paid/logged order only ever exists as a row once payment (or the
@@ -83,9 +84,9 @@ function PaymentField({ order }) {
     if (!sb || !order.stripeSessionId) { setLoading(false); return; }
     setLoading(true);
     setError(null);
-    sb.functions.invoke('get-order-payment', { body: { orderId: order.id } }).then(({ data, error: err }) => {
+    sb.functions.invoke('get-order-payment', { body: { orderId: order.id } }).then(async ({ data, error: err }) => {
       if (cancelled) return;
-      if (err || data?.error) { setError(data?.error || err?.message || 'Could not load Stripe details'); }
+      if (err || data?.error) { setError(await edgeFunctionErrorMessage(data, err, 'Could not load Stripe details')); }
       else setDetails(data);
       setLoading(false);
     });
