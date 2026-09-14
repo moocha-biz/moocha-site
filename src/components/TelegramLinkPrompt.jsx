@@ -89,7 +89,8 @@ export default function TelegramLinkPrompt({ phone, token }) {
           <a className="btn-secondary" style={{ marginBottom: 0, display: 'block', textAlign: 'center', textDecoration: 'none' }} href={linkUrl} target="_blank" rel="noreferrer">
             Open Telegram to finish connecting →
           </a>
-          <div className="sub" style={{ color: 'var(--brand)', marginTop: 8 }}>
+          <div className="sub" style={{ color: 'var(--brand)', marginTop: 8, display: 'flex', alignItems: 'center' }}>
+            <span className="pulse-dot" />
             Waiting for you to tap "Start" in Telegram…
           </div>
         </>

@@ -73,7 +73,7 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
       {order && (
         <>
           <div className="order-confirm-id">Order #{order.id}</div>
-          <div className="sheet-sub" style={{ textAlign: 'center' }}>Your loyalty stamps will be given when you collect this order. Quote order #{order.id} at pickup, or find it later under My Rewards.</div>
+          <div className="sheet-sub" style={{ textAlign: 'center' }}>You'll receive your loyalty stamps when you pick up this order. Quote order #{order.id} at pickup, or find it later under My Rewards.</div>
 
           {collectionWindow && (
             <div className="closed-banner" style={{ padding: '12px 14px', marginBottom: 14, background: 'var(--mint)' }}>
