@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMoocha } from '../store.jsx';
 import { money } from '../lib/storage.js';
 import { formatCollectionWindow } from '../lib/pickup.js';
+import TelegramLinkPrompt from './TelegramLinkPrompt.jsx';
 
 // The order row is written by the stripe-webhook function, which can lag a
 // beat behind the browser's redirect back from Stripe — so we poll briefly
@@ -10,7 +11,7 @@ const POLL_ATTEMPTS = 8;
 const POLL_INTERVAL_MS = 1200;
 
 export default function PaymentResultModal({ result, onClose, onRetry }) {
-  const { sb, saveCustomerToken, settings } = useMoocha();
+  const { sb, saveCustomerToken, settings, myProfile } = useMoocha();
   const [order, setOrder] = useState(null);
   const [gaveUp, setGaveUp] = useState(false);
   const collectionWindow = formatCollectionWindow(settings.collectionStart, settings.collectionEnd);
@@ -84,6 +85,7 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
             <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}</span><span>{money(it.lineTotal)}</span></div>
           ))}
           <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
+          <TelegramLinkPrompt phone={myProfile?.phone} token={myProfile?.customerToken} />
         </>
       )}
       <div className="sheet-sub" style={{ textAlign: 'center', marginTop: 4 }}>See you soon! 👋</div>
