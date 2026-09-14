@@ -148,11 +148,17 @@ export default function OrderDetailSheet({ order, onClose }) {
   const [marking, setMarking] = React.useState(false);
   const canRefund = order.status === 'Received' || order.status === 'Ready' || order.status === 'Collected';
 
+  const NOTIFY_SKIP_REASONS = {
+    'no phone': 'Marked ready - no phone on file, let them know in person',
+    'not linked': "Marked ready - not on Telegram, let them know in person",
+    'send failed': 'Marked ready - Telegram DM failed to send, let them know in person',
+  };
+
   const ready = async () => {
     setMarking(true);
-    const { notified } = await markOrderReady(order.id);
+    const { notified, reason } = await markOrderReady(order.id);
     setMarking(false);
-    showToast(notified ? 'Marked ready - customer notified on Telegram ✓' : 'Marked ready ✓');
+    showToast(notified ? 'Marked ready - customer notified on Telegram ✓' : (NOTIFY_SKIP_REASONS[reason] || 'Marked ready ✓'));
     onClose();
   };
 

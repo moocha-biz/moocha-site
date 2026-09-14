@@ -134,6 +134,7 @@ export default function CheckoutSheet({ onClose }) {
           <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}{it.redeemed ? ` · 🎁 ${it.freeQty || 1} free` : ''}</span><span>{money(it.lineTotal)}</span></div>
         ))}
         <div className="summary-row total"><span>Total</span><span>{money(0)}</span></div>
+        <TelegramLinkPrompt phone={myProfile?.phone} token={myProfile?.customerToken} />
         <div className="sheet-sub" style={{ textAlign: 'center', marginTop: 10 }}>See you soon! 👋</div>
         <button className="btn-primary" style={{ marginTop: 6 }} onClick={() => { onClose(); setTab('loyalty'); }}><span>Done</span></button>
       </>
@@ -153,7 +154,6 @@ export default function CheckoutSheet({ onClose }) {
       )}
       <div className="field"><label htmlFor="checkout-name">Name</label><input id="checkout-name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>
       <div className="field"><label htmlFor="checkout-phone">Phone number</label><input id="checkout-phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="9XXX XXXX" inputMode="tel" /></div>
-      <TelegramLinkPrompt phone={normalizeSgPhone(phone)} token={myProfile?.customerToken} />
       {!isFreeOrder && <div className="field"><label htmlFor="checkout-email">Email (for receipt)</label><input id="checkout-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" type="email" required /></div>}
       <div className="field"><label htmlFor="checkout-notes">Notes (optional)</label><textarea id="checkout-notes" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. allergies, pickup time" /></div>
       <div className="summary-row total" style={{ marginBottom: 14 }}><span>Total</span><span>{money(cartTotalAfterRedeem)}</span></div>
