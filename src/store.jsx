@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useLocation, useNavigate } from 'react-router-dom';
 import { sb } from './lib/supabaseClient.js';
 import { getLocal, setLocal } from './lib/storage.js';
+import { edgeFunctionErrorMessage } from './lib/edgeFunctionError.js';
 import {
   DEFAULT_MENU, DEFAULT_SETTINGS, DEFAULT_SUGAR_LEVELS, STAMP_GOAL,
   DEMO_PASSPHRASE_KEY, DEMO_DEFAULT_PASSPHRASE,
@@ -366,7 +367,7 @@ export function MoochaProvider({ children }) {
     if (order.stripeSessionId) {
       const { data, error } = await sb.functions.invoke('refund-order', { body: { orderId: order.id } });
       if (error || data?.error) {
-        const message = data?.error || error?.message || 'Refund failed';
+        const message = await edgeFunctionErrorMessage(data, error, 'Refund failed');
         noteSupabaseError('Refunding order', { message });
         return { error: message };
       }
