@@ -70,6 +70,11 @@ export default function TelegramLinkPrompt({ phone, token }) {
 
   return (
     <div className="field">
+      {!linkUrl && (
+        <div className="section-note" style={{ marginBottom: 6 }}>
+          Get a Telegram DM the moment your order's ready for pickup — no need to keep checking back.
+        </div>
+      )}
       {expired && (
         <div className="sub" style={{ color: 'var(--brand)', marginBottom: 8 }}>
           Link expired without connecting. Try again?

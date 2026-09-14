@@ -454,7 +454,7 @@ export function MoochaProvider({ children }) {
       const msg = error.message === 'needs_claim'
         ? 'Order online once, or ask staff for a rewards link, before connecting Telegram'
         : error.message === 'not_authorized'
-          ? 'This phone is already linked to a different account'
+          ? "This phone is linked to an account this browser can't verify — if it's yours, ask staff for a rewards link to reconnect it"
           : error.message || "Couldn't generate a Telegram link";
       return { error: msg };
     }
