@@ -76,7 +76,10 @@ Deno.serve(async (req) => {
       return new Response("ok", { status: 200 });
     }
 
-    await sendTelegramMessage(chatId, "You're linked! We'll message you here the moment your order's ready. 🧋");
+    await sendTelegramMessage(
+      chatId,
+      "You're linked! 🧋 We'll DM you here the moment your order's ready. Just quote your order number (or your name/phone) at the counter to collect it."
+    );
     return new Response("ok", { status: 200 });
   } catch (err) {
     console.error("telegram-webhook error:", err);
