@@ -144,15 +144,24 @@ function PaymentField({ order }) {
 }
 
 export default function OrderDetailSheet({ order, onClose }) {
-  const { markOrderCollected, markOrderReady, deleteOrder, refundOrder, showToast } = useMoocha();
+  const { markOrderCollected, markOrderPreparing, markOrderReady, deleteOrder, refundOrder, showToast } = useMoocha();
   const [refunding, setRefunding] = React.useState(false);
   const [marking, setMarking] = React.useState(false);
+  const [startingPrep, setStartingPrep] = React.useState(false);
   const canRefund = order.status === 'Received' || order.status === 'Preparing' || order.status === 'Ready' || order.status === 'Collected';
 
   const NOTIFY_SKIP_REASONS = {
     'no phone': 'Marked ready - no phone on file, let them know in person',
     'not linked': "Marked ready - not on Telegram, let them know in person",
     'send failed': 'Marked ready - Telegram DM failed to send, let them know in person',
+  };
+
+  const startPreparing = async () => {
+    setStartingPrep(true);
+    await markOrderPreparing(order.id);
+    setStartingPrep(false);
+    showToast('Marked preparing ✓');
+    onClose();
   };
 
   const ready = async () => {
@@ -212,6 +221,7 @@ export default function OrderDetailSheet({ order, onClose }) {
         <label>Prep requested at</label>
         <div className="admin-item-name">
           {order.prepRequestedAt ? new Date(order.prepRequestedAt).toLocaleString() : 'not requested yet'}
+          {order.prepRequestedBy ? ` · ${order.prepRequestedBy}` : order.prepRequestedAt ? ' · by customer' : ''}
         </div>
       </div>
 
@@ -262,7 +272,17 @@ export default function OrderDetailSheet({ order, onClose }) {
           original single "Mark collected" click. Only preorders (which sit
           around waiting for the customer to come back) go through Ready. */}
       {order.status === 'Received' && order.orderType === 'walkin' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
-      {(order.status === 'Received' || order.status === 'Preparing') && order.orderType !== 'walkin' && <button className="btn-primary" style={{ marginTop: 16 }} disabled={marking} onClick={ready}><span>{marking ? 'Marking ready…' : 'Mark ready'}</span><span>→</span></button>}
+      {/* Staff can flip Received -> Preparing themselves for a customer who
+          calls in or asks in person instead of tapping the app's own
+          "prepare my drink" button — same status either way, just a
+          different starting point. Secondary, not primary, since staff
+          can still skip straight to "Mark ready" below without it. */}
+      {order.status === 'Received' && order.orderType !== 'walkin' && (
+        <button className="btn-secondary" style={{ marginTop: 16 }} disabled={startingPrep} onClick={startPreparing}>
+          {startingPrep ? 'Marking preparing…' : 'Mark preparing (customer asked in person)'}
+        </button>
+      )}
+      {(order.status === 'Received' || order.status === 'Preparing') && order.orderType !== 'walkin' && <button className="btn-primary" style={{ marginTop: order.status === 'Received' ? 8 : 16 }} disabled={marking} onClick={ready}><span>{marking ? 'Marking ready…' : 'Mark ready'}</span><span>→</span></button>}
       {order.status === 'Ready' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
       {canRefund && (
         <button className="btn-secondary" style={{ marginTop: 8, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>
