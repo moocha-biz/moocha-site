@@ -303,7 +303,7 @@ export function MoochaProvider({ children }) {
     if (!changed) return { notified: false };
     try {
       const { data } = await sb.functions.invoke('notify-telegram', { body: { orderId: id } });
-      return { notified: !!data?.notified };
+      return { notified: !!data?.notified, reason: data?.reason };
     } catch {
       return { notified: false };
     }

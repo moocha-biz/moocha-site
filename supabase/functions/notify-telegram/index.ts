@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, status, phone")
+      .select("id, status, phone, items")
       .eq("id", orderId)
       .maybeSingle();
     if (orderError || !order) {
@@ -86,7 +86,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    await sendTelegramMessage(customer.telegram_chat_id, `🧋 Your order #${order.id} is ready for pickup!`);
+    const itemsSummary = Array.isArray(order.items)
+      ? order.items.map((it: { name?: string; qty?: number }) => `${it.name || 'item'} x${it.qty || 1}`).join(', ')
+      : '';
+
+    try {
+      await sendTelegramMessage(
+        customer.telegram_chat_id,
+        `🧋 Your order #${order.id} is ready for pickup!${itemsSummary ? `\n${itemsSummary}` : ''}`
+      );
+    } catch (sendErr) {
+      console.error("sendTelegramMessage failed:", sendErr);
+      return new Response(JSON.stringify({ skipped: true, reason: "send failed" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     return new Response(JSON.stringify({ notified: true }), {
       status: 200,

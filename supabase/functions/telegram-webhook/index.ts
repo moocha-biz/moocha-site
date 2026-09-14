@@ -40,8 +40,8 @@ Deno.serve(async (req) => {
   }
 
   // Always return 200 past this point — Telegram retries on non-2xx, and a
-  // malformed/irrelevant update (not a /start message) isn't an error on
-  // our side, just nothing to do.
+  // malformed update (no text/chatId) isn't an error on our side, just
+  // nothing to do.
   try {
     const update = await req.json();
     const message = update?.message;
@@ -49,7 +49,12 @@ Deno.serve(async (req) => {
     const chatId = message?.chat?.id;
     const username: string | undefined = message?.from?.username;
 
-    if (!text || !chatId || !text.startsWith("/start")) {
+    if (!text || !chatId) {
+      return new Response("ok", { status: 200 });
+    }
+
+    if (!text.startsWith("/start")) {
+      await sendTelegramMessage(chatId, "This bot only sends order-ready pings — for anything else, ask staff directly 🙂");
       return new Response("ok", { status: 200 });
     }
 
