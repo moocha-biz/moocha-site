@@ -92,7 +92,7 @@ export function MoochaProvider({ children }) {
     return data.map(r => ({
       id: r.id, name: r.name, phone: r.phone, date: r.date, items: r.items, total: Number(r.total), notes: r.notes,
       status: r.status, orderType: r.order_type, collectedAt: r.collected_at, collectedBy: r.collected_by,
-      readyAt: r.ready_at, readyBy: r.ready_by, prepRequestedAt: r.prep_requested_at,
+      readyAt: r.ready_at, readyBy: r.ready_by, prepRequestedAt: r.prep_requested_at, prepRequestedBy: r.prep_requested_by,
       stripeSessionId: r.stripe_session_id, refundedAt: r.refunded_at, refundedBy: r.refunded_by, refundId: r.refund_id,
       stockAlert: r.stock_alert,
     }));
@@ -278,6 +278,28 @@ export function MoochaProvider({ children }) {
     setOrders(await fetchOrders());
     setCustomers(await fetchCustomers());
   }, [sb, fetchOrders, fetchCustomers, noteSupabaseError]);
+
+  // Staff can also flip Received -> Preparing themselves, for a customer
+  // who calls in or asks in person instead of tapping the app's "prepare
+  // my drink" button (see requestOrderPrep). Same status as the
+  // customer-triggered path; prepRequestedBy just tells the two apart.
+  const markOrderPreparing = useCallback(async (id) => {
+    if (!sb) {
+      const list = getLocal('demo_orders', []);
+      const o = list.find(x => x.id === id);
+      if (o && o.status === 'Received') {
+        o.status = 'Preparing';
+        o.prepRequestedAt = new Date().toISOString();
+        o.prepRequestedBy = 'staff (demo)';
+        setLocal('demo_orders', list);
+        setOrders([...list]);
+      }
+      return;
+    }
+    const { error } = await sb.rpc('mark_order_preparing', { p_id: id });
+    if (error) { noteSupabaseError('Marking order preparing', error); return; }
+    setOrders(await fetchOrders());
+  }, [sb, fetchOrders, noteSupabaseError]);
 
   // Staff mark a preorder ready for pickup. Best-effort notifies the
   // customer over Telegram if they've linked it — an invoke failure here
@@ -757,7 +779,7 @@ export function MoochaProvider({ children }) {
     // backend actions
     fetchOrders, fetchSettings, fetchMenuData, fetchCustomers,
     menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuSaveItem,
-    persistSettings, setCollectionHours, deleteOrder, refundOrder, logWalkinOrder, markOrderCollected, markOrderReady,
+    persistSettings, setCollectionHours, deleteOrder, refundOrder, logWalkinOrder, markOrderCollected, markOrderPreparing, markOrderReady,
     setCustomerStamps, deleteCustomerRecord, generateClaimLink, requestTelegramLink, fetchTelegramLinkStatus,
     noteSupabaseError,
   };
