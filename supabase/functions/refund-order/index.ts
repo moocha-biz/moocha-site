@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { orderId } = await req.json();
+    const { orderId, amount, reason, requestId } = await req.json();
     if (!orderId) {
       return new Response(JSON.stringify({ error: "Missing orderId" }), {
         status: 400,
@@ -71,11 +71,34 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (order.status !== "Received" && order.status !== "Ready" && order.status !== "Collected") {
+    // Matches refund_order()'s own status check — "Preparing" is refundable
+    // too (added alongside request_order_prep), so this can't fall out of
+    // sync with the DB function the way it did before.
+    const REFUNDABLE_STATUSES = ["Received", "Preparing", "Ready", "Collected"];
+    if (!REFUNDABLE_STATUSES.includes(order.status)) {
       return new Response(JSON.stringify({ error: `Order is "${order.status}" — nothing to refund` }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // A partial refund (staff typed a specific amount, e.g. one missing
+    // item) vs. the default full refund of the whole order.
+    const isPartial = amount != null;
+    if (isPartial) {
+      const amountNum = Number(amount);
+      if (!Number.isFinite(amountNum) || amountNum <= 0) {
+        return new Response(JSON.stringify({ error: "Enter a valid refund amount" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (amountNum > Number(order.total)) {
+        return new Response(
+          JSON.stringify({ error: `Can't refund more than the order total ($${Number(order.total).toFixed(2)})` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
@@ -90,26 +113,56 @@ Deno.serve(async (req) => {
 
     // Idempotency key means a retried request (double-tap, network hiccup)
     // reuses the same refund on Stripe's side instead of refunding twice.
-    const refund = await stripe.refunds.create(
-      { payment_intent: paymentIntentId },
-      { idempotencyKey: `refund-${orderId}` }
-    );
+    // A partial refund needs a key that's unique per *attempt* rather than
+    // per order — there can legitimately be several over an order's life —
+    // so it folds in a client-supplied requestId (one generated per button
+    // press, same pattern CheckoutSheet uses for its orderId).
+    const idempotencyKey = isPartial
+      ? `refund-partial-${orderId}-${requestId || crypto.randomUUID()}`
+      : `refund-${orderId}`;
+
+    let refund;
+    try {
+      refund = await stripe.refunds.create(
+        {
+          payment_intent: paymentIntentId,
+          ...(isPartial ? { amount: Math.round(Number(amount) * 100) } : {}),
+        },
+        { idempotencyKey }
+      );
+    } catch (stripeErr) {
+      // Most commonly "this would exceed what's left on the charge" —
+      // Stripe is the source of truth for that, not anything computed here.
+      console.error("Stripe refund failed:", stripeErr);
+      const message = stripeErr instanceof Error ? stripeErr.message : "Stripe refund failed";
+      return new Response(JSON.stringify({ error: message }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // The money has now genuinely moved back on Stripe's side. If this next
-    // step fails, the order is stuck showing "Received"/"Collected" despite
-    // being refunded — surface that distinctly so staff know to fix the DB
-    // row by hand rather than assume the refund itself didn't go through.
+    // step fails, the order/refund history is stuck out of sync with what
+    // actually happened on Stripe — surface that distinctly so staff know
+    // to fix the DB row by hand rather than assume the refund itself didn't
+    // go through.
     //
     // Uses authedClient (the caller's own session), not the service-role
-    // `supabase` client used above — refund_order() stamps refunded_by
-    // with auth.email(), which only resolves to the actual staff member
-    // when the RPC runs under their own JWT rather than the service role.
-    const { error: rpcError } = await authedClient.rpc("refund_order", {
-      p_id: orderId,
-      p_refund_id: refund.id,
-    });
+    // `supabase` client used above — both RPCs stamp refunded_by with
+    // auth.email(), which only resolves to the actual staff member when
+    // the RPC runs under their own JWT rather than the service role.
+    // A partial refund never touches status/stamps/stock (ambiguous which
+    // item it covers), unlike refund_order()'s full, order-is-void reversal.
+    const { error: rpcError } = isPartial
+      ? await authedClient.rpc("log_partial_refund", {
+          p_id: orderId,
+          p_amount: Number(amount),
+          p_refund_id: refund.id,
+          p_reason: reason || null,
+        })
+      : await authedClient.rpc("refund_order", { p_id: orderId, p_refund_id: refund.id });
     if (rpcError) {
-      console.error("Stripe refund succeeded but refund_order() failed:", rpcError);
+      console.error("Stripe refund succeeded but recording it failed:", rpcError);
       return new Response(
         JSON.stringify({
           error: "Refunded on Stripe, but couldn't update the order — please tell an admin to check this order.",
@@ -118,7 +171,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    return new Response(JSON.stringify({ success: true, refundId: refund.id }), {
+    return new Response(JSON.stringify({ success: true, refundId: refund.id, partial: isPartial }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
