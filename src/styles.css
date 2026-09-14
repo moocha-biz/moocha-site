@@ -226,6 +226,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .order-row{ background:var(--paper); border-radius:16px; padding:13px 14px; margin-bottom:9px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow); border-left:4px solid transparent;}
 .order-row.pending-walkin{ border-left-color:var(--sun-deep); background:#FFFBF0;}
 .order-row.pending-preorder{ border-left-color:var(--green); background:#F3F9F0;}
+.order-row.preparing-now{ border-left-color:var(--card-yellow); background:#FFFCEF;}
 .order-row.ready-pickup{ border-left-color:var(--lilac); background:#FDF3FE;}
 .order-row-left .oid{ font-size:11px; color:var(--brand); font-weight:700;}
 .order-row-left .oitems{ font-size:13px; font-weight:800; margin-top:2px; font-family:'Baloo 2';}
@@ -234,6 +235,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .order-status{ font-size:9.5px; font-weight:800; padding:2px 9px; border-radius:999px; background:var(--mint); color:var(--green-dark); text-transform:uppercase; margin-top:4px; display:inline-block;}
 .order-status.status-refunded{ background:var(--blush); color:#8a3a2a;}
 .order-status.status-failed{ background:#e8e8e8; color:#6b6b6b;}
+.order-status.status-preparing{ background:var(--card-yellow); color:#8a5b05;}
 
 .qr-box{ background:#fff; padding:18px; border-radius:20px; display:flex; justify-content:center; margin:6px 0 14px 0; box-shadow: var(--shadow);}
 .pay-amount{ text-align:center; font-family:'Baloo 2'; font-size:30px; font-weight:800; color:var(--green-dark); margin-bottom:2px;}

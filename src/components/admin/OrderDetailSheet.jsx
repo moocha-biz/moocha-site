@@ -24,12 +24,13 @@ function OrderProgress({ status }) {
       </div>
     );
   }
-  const STEP_ORDER = { Received: 0, Ready: 1, Collected: 2 };
+  const STEP_ORDER = { Received: 0, Preparing: 1, Ready: 2, Collected: 3 };
   const at = STEP_ORDER[status] ?? 0;
   const steps = [
     { label: 'Order placed', done: at >= 0 },
-    { label: 'Ready for pickup', done: at >= 1 },
-    { label: 'Collected', done: at >= 2 },
+    { label: 'Preparing', done: at >= 1 },
+    { label: 'Ready for pickup', done: at >= 2 },
+    { label: 'Collected', done: at >= 3 },
   ];
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', margin: '2px 0 20px 0' }}>
@@ -146,7 +147,7 @@ export default function OrderDetailSheet({ order, onClose }) {
   const { markOrderCollected, markOrderReady, deleteOrder, refundOrder, showToast } = useMoocha();
   const [refunding, setRefunding] = React.useState(false);
   const [marking, setMarking] = React.useState(false);
-  const canRefund = order.status === 'Received' || order.status === 'Ready' || order.status === 'Collected';
+  const canRefund = order.status === 'Received' || order.status === 'Preparing' || order.status === 'Ready' || order.status === 'Collected';
 
   const NOTIFY_SKIP_REASONS = {
     'no phone': 'Marked ready - no phone on file, let them know in person',
@@ -208,6 +209,13 @@ export default function OrderDetailSheet({ order, onClose }) {
       </div>
 
       <div className="field">
+        <label>Prep requested at</label>
+        <div className="admin-item-name">
+          {order.prepRequestedAt ? new Date(order.prepRequestedAt).toLocaleString() : 'not requested yet'}
+        </div>
+      </div>
+
+      <div className="field">
         <label>Ready at</label>
         <div className="admin-item-name">
           {order.readyAt ? new Date(order.readyAt).toLocaleString() : 'not yet ready'}
@@ -254,7 +262,7 @@ export default function OrderDetailSheet({ order, onClose }) {
           original single "Mark collected" click. Only preorders (which sit
           around waiting for the customer to come back) go through Ready. */}
       {order.status === 'Received' && order.orderType === 'walkin' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
-      {order.status === 'Received' && order.orderType !== 'walkin' && <button className="btn-primary" style={{ marginTop: 16 }} disabled={marking} onClick={ready}><span>{marking ? 'Marking ready…' : 'Mark ready'}</span><span>→</span></button>}
+      {(order.status === 'Received' || order.status === 'Preparing') && order.orderType !== 'walkin' && <button className="btn-primary" style={{ marginTop: 16 }} disabled={marking} onClick={ready}><span>{marking ? 'Marking ready…' : 'Mark ready'}</span><span>→</span></button>}
       {order.status === 'Ready' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
       {canRefund && (
         <button className="btn-secondary" style={{ marginTop: 8, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>

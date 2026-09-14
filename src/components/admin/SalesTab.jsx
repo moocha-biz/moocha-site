@@ -41,14 +41,15 @@ export default function SalesTab() {
   // Revenue/best-sellers/etc. should only ever reflect money actually in
   // hand — 'Refunded' gave it back, and 'Payment failed' never collected
   // it in the first place (the checkout session just expired unpaid).
-  // 'Received', 'Ready', and 'Collected' are all states reachable only once
-  // payment genuinely succeeded (see canRefund in OrderDetailSheet).
-  // Memoized so the chart-rebuild effect below only re-fires when `orders`
-  // itself actually changes, not on every render (a fresh .filter() result
-  // is a new array reference each time, which would otherwise destroy and
-  // recreate the Chart.js instance far more often than needed).
+  // 'Received', 'Preparing', 'Ready', and 'Collected' are all states
+  // reachable only once payment genuinely succeeded (see canRefund in
+  // OrderDetailSheet). Memoized so the chart-rebuild effect below only
+  // re-fires when `orders` itself actually changes, not on every render (a
+  // fresh .filter() result is a new array reference each time, which would
+  // otherwise destroy and recreate the Chart.js instance far more often
+  // than needed).
   const paidOrders = useMemo(
-    () => orders.filter(o => o.status === 'Received' || o.status === 'Ready' || o.status === 'Collected'),
+    () => orders.filter(o => o.status === 'Received' || o.status === 'Preparing' || o.status === 'Ready' || o.status === 'Collected'),
     [orders]
   );
 
