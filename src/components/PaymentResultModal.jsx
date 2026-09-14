@@ -11,10 +11,22 @@ const POLL_ATTEMPTS = 8;
 const POLL_INTERVAL_MS = 1200;
 
 export default function PaymentResultModal({ result, onClose, onRetry }) {
-  const { sb, saveCustomerToken, settings, myProfile } = useMoocha();
+  const { sb, saveCustomerToken, settings, myProfile, requestOrderPrep } = useMoocha();
   const [order, setOrder] = useState(null);
   const [gaveUp, setGaveUp] = useState(false);
+  const [requestingPrep, setRequestingPrep] = useState(false);
   const collectionWindow = formatCollectionWindow(settings.collectionStart, settings.collectionEnd);
+
+  // Lets a customer who's already on their way (or already at the counter)
+  // tell staff "start now" right from the confirmation screen, instead of
+  // waiting to find this order again under My Rewards.
+  const startPreparing = async () => {
+    setRequestingPrep(true);
+    const { error, changed } = await requestOrderPrep(order.id, myProfile?.phone, order.customerToken || myProfile?.customerToken);
+    setRequestingPrep(false);
+    if (error) return;
+    setOrder(o => (o && changed ? { ...o, status: 'Preparing' } : o));
+  };
 
   useEffect(() => {
     setOrder(null);
@@ -85,6 +97,18 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
             <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}</span><span>{money(it.lineTotal)}</span></div>
           ))}
           <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
+
+          {order.status === 'Received' && (
+            <button className="btn-secondary" style={{ marginTop: 4 }} disabled={requestingPrep} onClick={startPreparing}>
+              {requestingPrep ? 'Letting staff know…' : '▶ On my way - start preparing'}
+            </button>
+          )}
+          {order.status === 'Preparing' && (
+            <div className="closed-banner" style={{ padding: '10px 14px', marginTop: 4, background: 'var(--card-yellow)' }}>
+              <div className="sub" style={{ color: '#8a5b05' }}>🔥 Staff notified - they'll start on it now</div>
+            </div>
+          )}
+
           <TelegramLinkPrompt phone={myProfile?.phone} token={myProfile?.customerToken} />
         </>
       )}

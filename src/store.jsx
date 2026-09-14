@@ -92,7 +92,7 @@ export function MoochaProvider({ children }) {
     return data.map(r => ({
       id: r.id, name: r.name, phone: r.phone, date: r.date, items: r.items, total: Number(r.total), notes: r.notes,
       status: r.status, orderType: r.order_type, collectedAt: r.collected_at, collectedBy: r.collected_by,
-      readyAt: r.ready_at, readyBy: r.ready_by,
+      readyAt: r.ready_at, readyBy: r.ready_by, prepRequestedAt: r.prep_requested_at,
       stripeSessionId: r.stripe_session_id, refundedAt: r.refunded_at, refundedBy: r.refunded_by, refundId: r.refund_id,
       stockAlert: r.stock_alert,
     }));
@@ -287,7 +287,7 @@ export function MoochaProvider({ children }) {
     if (!sb) {
       const list = getLocal('demo_orders', []);
       const o = list.find(x => x.id === id);
-      if (o && o.status === 'Received') {
+      if (o && (o.status === 'Received' || o.status === 'Preparing')) {
         o.status = 'Ready';
         o.readyAt = new Date().toISOString();
         setLocal('demo_orders', list);
@@ -407,8 +407,30 @@ export function MoochaProvider({ children }) {
     if (!sb) return getLocal('demo_orders', []).filter(o => o.phone === phone);
     const { data, error } = await sb.rpc('get_my_orders', { p_phone: phone, p_token: token || null });
     if (error) { noteSupabaseError('Loading your orders', error); return []; }
-    return (data || []).map(r => ({ id: r.id, date: r.date, items: r.items, total: Number(r.total), status: r.status }));
+    return (data || []).map(r => ({ id: r.id, date: r.date, items: r.items, total: Number(r.total), status: r.status, orderType: r.orderType }));
   }, [noteSupabaseError]);
+
+  // Customer-initiated: "start making my order now" instead of staff
+  // guessing when to start (too early and it sits/melts before pickup, too
+  // late and the customer waits at the counter). Purely a hint — staff can
+  // still mark an order ready straight from 'Received' on their own, so
+  // nothing is stuck if a customer never taps this.
+  const requestOrderPrep = useCallback(async (id, phone, token) => {
+    if (!sb) {
+      const list = getLocal('demo_orders', []);
+      const o = list.find(x => x.id === id);
+      if (o && o.status === 'Received') {
+        o.status = 'Preparing';
+        o.prepRequestedAt = new Date().toISOString();
+        setLocal('demo_orders', list);
+        setOrders([...list]);
+      }
+      return { error: null, changed: true };
+    }
+    const { data: changed, error } = await sb.rpc('request_order_prep', { p_id: id, p_phone: phone, p_token: token || null });
+    if (error) { noteSupabaseError('Requesting order prep', error); return { error }; }
+    return { error: null, changed: !!changed };
+  }, [sb, noteSupabaseError]);
 
   const saveProfile = useCallback((profile) => {
     // Merge rather than replace — callers like CheckoutSheet only pass
@@ -715,7 +737,7 @@ export function MoochaProvider({ children }) {
     // customer state
     tab, setTab, activeCat, setActiveCat,
     cart, cartSubtotal, addLineToCart, cartQty, updateLine, removeLine, clearCart,
-    myProfile, saveProfile, saveCustomerToken, myStamps, refreshMyLoyalty, fetchMyOrders, claimRewards,
+    myProfile, saveProfile, saveCustomerToken, myStamps, refreshMyLoyalty, fetchMyOrders, requestOrderPrep, claimRewards,
     freeUnitsByLineId, totalFreeUnits, redeemDiscount, cartTotalAfterRedeem,
     // shared state
     menu, setMenu, settings, setSettings, ordersOpen, orders, setOrders, customers, setCustomers,

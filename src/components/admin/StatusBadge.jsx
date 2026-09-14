@@ -4,6 +4,7 @@
 // view color-codes it.
 export const STATUS_STYLE = {
   'Received': { background: 'var(--sun)', color: '#8a5b05' },
+  'Preparing': { background: 'var(--card-yellow)', color: '#8a5b05' },
   'Ready': { background: 'var(--lilac)', color: '#7a3d78' },
   'Collected': { background: 'var(--green)', color: '#fff' },
   'Refunded': { background: 'var(--blush)', color: '#8a3a2a' },
