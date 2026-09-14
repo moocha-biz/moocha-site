@@ -120,7 +120,10 @@ echo $! > "$STRIPE_PID"
 echo "    waiting for stripe listen to hand out a webhook signing secret..."
 WEBHOOK_SECRET=""
 for _ in $(seq 1 15); do
-  WEBHOOK_SECRET=$(grep -oE 'whsec_[A-Za-z0-9]+' "$STRIPE_LOG" | head -1 || true)
+  # -a: stripe listen's spinner writes non-UTF8 bytes while "Getting
+  # ready..." is showing, which makes grep treat the file as binary and
+  # print "Binary file ... matches" instead of the secret without -a.
+  WEBHOOK_SECRET=$(grep -aoE 'whsec_[A-Za-z0-9]+' "$STRIPE_LOG" | head -1 || true)
   [ -n "$WEBHOOK_SECRET" ] && break
   sleep 1
 done

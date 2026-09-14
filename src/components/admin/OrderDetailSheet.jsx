@@ -200,6 +200,24 @@ export default function OrderDetailSheet({ order, onClose }) {
     onClose();
   };
 
+  // A specific amount (e.g. one missing item) rather than voiding the whole
+  // order — doesn't touch status/stamps/stock, see refund-order/index.ts.
+  // Doesn't close the sheet after, since the order's still active and staff
+  // may want to see the updated refund history right away.
+  const partialRefund = async () => {
+    const raw = window.prompt(`Partial refund amount for order #${order.id} (max ${money(order.total)}):`);
+    if (raw == null) return;
+    const amount = parseFloat(raw);
+    if (!Number.isFinite(amount) || amount <= 0) { showToast('Enter a valid amount'); return; }
+    const reason = window.prompt('Reason (optional, shown in the order history):') || '';
+    if (!window.confirm(`Really refund ${money(amount)} via Stripe for order #${order.id}? This can't be undone.`)) return;
+    setRefunding(true);
+    const { error } = await refundOrder(order, { amount, reason });
+    setRefunding(false);
+    if (error) { showToast(error); return; }
+    showToast(`${money(amount)} refunded ✓`);
+  };
+
   return (
     <>
       <div className="sheet-close" />
@@ -255,6 +273,24 @@ export default function OrderDetailSheet({ order, onClose }) {
         </div>
       )}
 
+      {/* Independent of status - a partially refunded order stays
+          Received/Preparing/Ready/Collected, only a full refund flips it
+          to Refunded (see refund-order/index.ts). */}
+      {(order.partialRefunds || []).length > 0 && (
+        <div className="field">
+          <label>Partial refunds</label>
+          {order.partialRefunds.map((pr, i) => (
+            <div className="admin-item-name" key={i} style={{ fontSize: 12.5, wordBreak: 'break-all', marginBottom: 4 }}>
+              {money(pr.amount)}{pr.reason ? ` — ${pr.reason}` : ''}
+              <br />
+              {pr.refundedAt ? new Date(pr.refundedAt).toLocaleString() : ''}
+              {pr.refundedBy ? ` · ${pr.refundedBy}` : ''}
+              {pr.refundId ? ` · ${pr.refundId}` : ''}
+            </div>
+          ))}
+        </div>
+      )}
+
       {order.notes && (
         <div className="field"><label>Notes</label><div className="admin-item-name" style={{ fontWeight: 600 }}>{order.notes}</div></div>
       )}
@@ -289,6 +325,11 @@ export default function OrderDetailSheet({ order, onClose }) {
         <button className="btn-secondary" style={{ marginTop: 8, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>
           {refunding ? 'Refunding…' : order.stripeSessionId ? 'Refund via Stripe' : isRedeemed ? 'Cancel & refund stamps' : 'Mark refunded (cash)'}
         </button>
+      )}
+      {canRefund && order.stripeSessionId && (
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
+          <span className="edit-link" onClick={partialRefund}>Partial refund…</span>
+        </div>
       )}
       {/* A small text link, not a full-width button like refund — delete is
           rare and destructive, and shouldn't share visual weight with the
