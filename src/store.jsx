@@ -415,9 +415,17 @@ export function MoochaProvider({ children }) {
   // late and the customer waits at the counter). Purely a hint — staff can
   // still mark an order ready straight from 'Received' on their own, so
   // nothing is stuck if a customer never taps this.
+  //
+  // aheadDrinks is a one-off snapshot, not a live countdown: how many drink
+  // units were already sitting in 'Preparing' the instant this request
+  // landed, so the customer gets a rough sense of the queue without staff
+  // having to estimate minutes.
   const requestOrderPrep = useCallback(async (id, phone, token) => {
     if (!sb) {
       const list = getLocal('demo_orders', []);
+      const ahead = list
+        .filter(o => o.status === 'Preparing' && o.id !== id)
+        .reduce((s, o) => s + (o.items || []).reduce((qs, it) => qs + (it.qty || 0), 0), 0);
       const o = list.find(x => x.id === id);
       if (o && o.status === 'Received') {
         o.status = 'Preparing';
@@ -425,11 +433,11 @@ export function MoochaProvider({ children }) {
         setLocal('demo_orders', list);
         setOrders([...list]);
       }
-      return { error: null, changed: true };
+      return { error: null, changed: true, aheadDrinks: ahead };
     }
-    const { data: changed, error } = await sb.rpc('request_order_prep', { p_id: id, p_phone: phone, p_token: token || null });
+    const { data, error } = await sb.rpc('request_order_prep', { p_id: id, p_phone: phone, p_token: token || null });
     if (error) { noteSupabaseError('Requesting order prep', error); return { error }; }
-    return { error: null, changed: !!changed };
+    return { error: null, changed: !!data?.changed, aheadDrinks: data?.aheadDrinks ?? 0 };
   }, [sb, noteSupabaseError]);
 
   const saveProfile = useCallback((profile) => {

@@ -22,10 +22,10 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
   // waiting to find this order again under My Rewards.
   const startPreparing = async () => {
     setRequestingPrep(true);
-    const { error, changed } = await requestOrderPrep(order.id, myProfile?.phone, order.customerToken || myProfile?.customerToken);
+    const { error, changed, aheadDrinks } = await requestOrderPrep(order.id, myProfile?.phone, order.customerToken || myProfile?.customerToken);
     setRequestingPrep(false);
     if (error) return;
-    setOrder(o => (o && changed ? { ...o, status: 'Preparing' } : o));
+    setOrder(o => (o && changed ? { ...o, status: 'Preparing', aheadDrinks } : o));
   };
 
   useEffect(() => {
@@ -105,7 +105,10 @@ export default function PaymentResultModal({ result, onClose, onRetry }) {
           )}
           {order.status === 'Preparing' && (
             <div className="closed-banner" style={{ padding: '10px 14px', marginTop: 4, background: 'var(--card-yellow)' }}>
-              <div className="sub" style={{ color: '#8a5b05' }}>🔥 Staff notified - they'll start on it now</div>
+              <div className="sub" style={{ color: '#8a5b05' }}>
+                🔥 Staff notified - they'll start on it now
+                {order.aheadDrinks != null && (order.aheadDrinks === 0 ? " - you're next!" : ` - ${order.aheadDrinks} drink${order.aheadDrinks === 1 ? '' : 's'} ahead of you`)}
+              </div>
             </div>
           )}
 

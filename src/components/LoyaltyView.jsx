@@ -33,10 +33,10 @@ export default function LoyaltyView() {
   // their own or the customer shows up at the counter and asks in person.
   const startPreparing = async (id) => {
     setRequestingId(id);
-    const { error, changed } = await requestOrderPrep(id, myPhone, myToken);
+    const { error, changed, aheadDrinks } = await requestOrderPrep(id, myPhone, myToken);
     setRequestingId(null);
     if (error) { showToast('Could not reach staff - try again in a moment'); return; }
-    if (changed) setMyOrders(list => list.map(o => o.id === id ? { ...o, status: 'Preparing' } : o));
+    if (changed) setMyOrders(list => list.map(o => o.id === id ? { ...o, status: 'Preparing', aheadDrinks } : o));
     showToast(changed ? "Staff notified - they'll start on it now ✓" : 'Already being prepared ✓');
   };
 
@@ -69,6 +69,11 @@ export default function LoyaltyView() {
               >
                 {requestingId === o.id ? 'Letting staff know…' : '▶ Start preparing my order'}
               </button>
+            )}
+            {o.status === 'Preparing' && o.aheadDrinks != null && (
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--brand)', marginTop: 6 }}>
+                🔥 {o.aheadDrinks === 0 ? "You're next!" : `${o.aheadDrinks} drink${o.aheadDrinks === 1 ? '' : 's'} ahead of you`}
+              </div>
             )}
           </div>
           <div className="order-row-right"><div className="oprice">{money(o.total)}</div></div>
