@@ -156,7 +156,7 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
       <div className="field"><label htmlFor="walkin-phone">Phone (optional - needed for a stamp)</label><input id="walkin-phone" value={phone} onChange={e => { setPhone(e.target.value); setRawFreeQtyByKey({}); }} inputMode="tel" /></div>
       {canRedeem && (
         <div className="section-note" style={{ marginTop: -8, marginBottom: 12, color: 'var(--green-dark)', fontWeight: 800 }}>
-          🎁 {customerStamps} stamps + {cartQtyTotal} in this order → {totalFreeUnits} free drink{totalFreeUnits > 1 ? 's' : ''}. Tap 🎁 on a line below ({freeRemaining} left to assign).
+          {customerStamps} stamps + {cartQtyTotal} in this order → {totalFreeUnits} free drink{totalFreeUnits > 1 ? 's' : ''}. Tap "make free" on a line below ({freeRemaining} left to assign).
         </div>
       )}
 
@@ -217,7 +217,7 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
                     <button className="mini-btn" onClick={() => addUnit(itemById[l.itemId], l.sugar)}>+</button>
                   </div>
                   {canRedeem && (free > 0 || freeRemaining > 0) && (
-                    <span className="edit-link" onClick={() => cycleFree(key, l.qty)}>{free > 0 ? `🎁 ${free} free ✓` : '🎁 make free'}</span>
+                    <span className="edit-link" onClick={() => cycleFree(key, l.qty)}>{free > 0 ? `${free} free ✓` : 'make free'}</span>
                   )}
                 </div>
               </div>

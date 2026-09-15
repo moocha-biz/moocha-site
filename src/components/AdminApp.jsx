@@ -19,7 +19,7 @@ export default function AdminApp() {
   return (
     <div className="app" id="adminApp" style={{ display: 'flex' }}>
       <div className="admin-header">
-        <div className="heading">🐮 moocha staff</div>
+        <div className="heading">moocha staff</div>
         <div className="admin-header-btns">
           <button className="admin-back" onClick={() => refreshAdminData().then(() => setAdminTab(adminTab))}>↻ Refresh</button>
           <button className="admin-logout" onClick={logOut}>Log out</button>
@@ -31,10 +31,10 @@ export default function AdminApp() {
         ))}
       </div>
       <div className="admin-main">
-        {!sb && <div className="demo-banner">⚠️ Demo mode - Supabase isn't connected yet, so this data is only on this device. See README.md.</div>}
+        {!sb && <div className="demo-banner">Demo mode - Supabase isn't connected yet, so this data is only on this device. See README.md.</div>}
         {lastSupabaseError && (
           <div className="demo-banner" style={{ background: 'var(--blush)', color: '#8a3a2a' }}>
-            ⚠️ {lastSupabaseError}
+            {lastSupabaseError}
             <span className="remove-link" style={{ color: '#8a3a2a', display: 'block', marginTop: 4 }} onClick={() => setLastSupabaseError(null)}>Dismiss</span>
           </div>
         )}

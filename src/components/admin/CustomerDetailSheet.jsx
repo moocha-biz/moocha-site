@@ -1,16 +1,24 @@
 import { useState } from 'react';
+import QRCode from 'qrcode';
 import { useMoocha, STAMP_GOAL } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
 import StampCard from '../StampCard.jsx';
 import StatusBadge from './StatusBadge.jsx';
 
 const RECENT_ORDERS_SHOWN = 8;
+const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME;
 
 export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
-  const { orders, setCustomerStamps, deleteCustomerRecord, fetchCustomers, setCustomers, generateClaimLink, showToast } = useMoocha();
+  const {
+    orders, setCustomerStamps, deleteCustomerRecord, fetchCustomers, setCustomers,
+    generateClaimLink, generateTelegramLinkStaff, showToast,
+  } = useMoocha();
   const [stampInput, setStampInput] = useState(customer.stamps || 0);
   const [claimLink, setClaimLink] = useState(null);
   const [generatingClaim, setGeneratingClaim] = useState(false);
+  const [telegramLink, setTelegramLink] = useState(null);
+  const [telegramQr, setTelegramQr] = useState(null);
+  const [generatingTelegram, setGeneratingTelegram] = useState(false);
 
   const shareClaimLink = async () => {
     setGeneratingClaim(true);
@@ -23,6 +31,21 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
   const copyClaimLink = async () => {
     try { await navigator.clipboard.writeText(claimLink); showToast('Link copied ✓'); }
     catch { showToast('Could not copy - select and copy it manually'); }
+  };
+
+  // Staff-mediated Telegram connect for a walk-in customer at the counter
+  // — see generate_telegram_link_code_staff for why the self-service RPC
+  // (checkout/Orders page) can't be used here. Shows a QR (not just a
+  // link) since the customer scans this with their own phone, on the spot.
+  const shareTelegramLink = async () => {
+    setGeneratingTelegram(true);
+    const { code, error } = await generateTelegramLinkStaff(customer.phone);
+    setGeneratingTelegram(false);
+    if (error) { showToast(error); return; }
+    const url = `https://t.me/${BOT_USERNAME}?start=${code}`;
+    setTelegramLink(url);
+    try { setTelegramQr(await QRCode.toDataURL(url, { margin: 1, width: 200 })); }
+    catch { setTelegramQr(null); }
   };
 
   // `orders` is already fetched newest-first, so slicing here is enough —
@@ -57,10 +80,10 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
       <div className="sheet-title">{customer.name || '(no name)'}</div>
       <div className="sheet-sub">
         {customer.phone} · {stats.count} orders · {money(stats.spend)} spent
-        {customer.telegram_username ? ` · 🔔 @${customer.telegram_username}` : ''}
+        {customer.telegram_username ? ` · @${customer.telegram_username}` : ''}
       </div>
       <div style={{ marginBottom: 18 }}>
-        <StampCard stamps={customer.stamps || 0} flipEnabled={false} rewardMessage="🎉 free drink ready to redeem" />
+        <StampCard stamps={customer.stamps || 0} flipEnabled={false} rewardMessage="free drink ready to redeem" />
       </div>
 
       <div className="field">
@@ -84,6 +107,34 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
           </>
         )}
       </div>
+
+      {BOT_USERNAME && !customer.telegram_chat_id && (
+        <div className="field">
+          <label>Connect their Telegram</label>
+          <div className="sub" style={{ color: 'var(--brand)', marginBottom: 8 }}>
+            For a walk-in customer who wants order-ready pings on Telegram - generate a QR (valid 15 minutes) for
+            them to scan with their own phone right now.
+          </div>
+          {!telegramLink && (
+            <button className="btn-secondary" style={{ marginBottom: 0 }} disabled={generatingTelegram} onClick={shareTelegramLink}>
+              {generatingTelegram ? 'Generating…' : 'Generate Telegram QR'}
+            </button>
+          )}
+          {telegramLink && (
+            <>
+              {telegramQr && (
+                <div style={{ textAlign: 'center', marginBottom: 8 }}>
+                  <img src={telegramQr} alt="Telegram connect QR code" width={160} height={160} style={{ borderRadius: 12, background: '#fff' }} />
+                </div>
+              )}
+              <input readOnly value={telegramLink} onFocus={e => e.target.select()} style={{ fontSize: 12, wordBreak: 'break-all' }} />
+              <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+                <span className="edit-link" onClick={shareTelegramLink}>Generate new one</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="field">
         <label htmlFor="customer-stamp-count">Set exact stamp count (goal: {STAMP_GOAL})</label>

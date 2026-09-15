@@ -20,14 +20,16 @@ export function useMoocha() {
 // Stripe-redirect handler in App.jsx) working unchanged — `tab` now just
 // derives from the URL instead of being independent state, and `setTab`
 // navigates instead of setting a local flag. That's what makes /menu,
-// /cart and /rewards real, bookmarkable, shareable URLs.
+// /cart, /orders and /rewards real, bookmarkable, shareable URLs.
 function tabFromPath(pathname) {
   if (pathname.startsWith('/cart')) return 'cart';
+  if (pathname.startsWith('/orders')) return 'orders';
   if (pathname.startsWith('/rewards')) return 'loyalty';
   return 'menu';
 }
 function pathFromTab(tab) {
   if (tab === 'cart') return '/cart';
+  if (tab === 'orders') return '/orders';
   if (tab === 'loyalty') return '/rewards';
   return '/menu';
 }
@@ -281,9 +283,12 @@ export function MoochaProvider({ children }) {
   }, [sb, fetchOrders, fetchCustomers, noteSupabaseError]);
 
   // Staff can also flip Received -> Preparing themselves, for a customer
-  // who calls in or asks in person instead of tapping the app's "prepare
-  // my drink" button (see requestOrderPrep). Same status as the
-  // customer-triggered path; prepRequestedBy just tells the two apart.
+  // who calls in or asks in person instead of requesting it themselves via
+  // the Telegram bot (see telegram-webhook's handlePrepRequest). Same
+  // status as the customer-triggered path; prepRequestedBy just tells the
+  // two apart.
+  // Best-effort notifies over Telegram if linked, same swallow-on-failure
+  // posture as markOrderReady.
   const markOrderPreparing = useCallback(async (id) => {
     if (!sb) {
       const list = getLocal('demo_orders', []);
@@ -300,6 +305,9 @@ export function MoochaProvider({ children }) {
     const { error } = await sb.rpc('mark_order_preparing', { p_id: id });
     if (error) { noteSupabaseError('Marking order preparing', error); return; }
     setOrders(await fetchOrders());
+    try {
+      await sb.functions.invoke('notify-telegram', { body: { orderId: id, stage: 'preparing' } });
+    } catch { /* best-effort, status change already succeeded */ }
   }, [sb, fetchOrders, noteSupabaseError]);
 
   // Staff mark a preorder ready for pickup. Best-effort notifies the
@@ -325,7 +333,7 @@ export function MoochaProvider({ children }) {
     // first) — nothing actually changed, so don't send a second DM.
     if (!changed) return { notified: false };
     try {
-      const { data } = await sb.functions.invoke('notify-telegram', { body: { orderId: id } });
+      const { data } = await sb.functions.invoke('notify-telegram', { body: { orderId: id, stage: 'ready' } });
       return { notified: !!data?.notified, reason: data?.reason };
     } catch {
       return { notified: false };
@@ -441,35 +449,15 @@ export function MoochaProvider({ children }) {
     return (data || []).map(r => ({ id: r.id, date: r.date, items: r.items, total: Number(r.total), status: r.status, orderType: r.orderType }));
   }, [noteSupabaseError]);
 
-  // Customer-initiated: "start making my order now" instead of staff
-  // guessing when to start (too early and it sits/melts before pickup, too
-  // late and the customer waits at the counter). Purely a hint — staff can
-  // still mark an order ready straight from 'Received' on their own, so
-  // nothing is stuck if a customer never taps this.
-  //
-  // aheadDrinks is a one-off snapshot, not a live countdown: how many drink
-  // units were already sitting in 'Preparing' the instant this request
-  // landed, so the customer gets a rough sense of the queue without staff
-  // having to estimate minutes.
-  const requestOrderPrep = useCallback(async (id, phone, token) => {
-    if (!sb) {
-      const list = getLocal('demo_orders', []);
-      const ahead = list
-        .filter(o => o.status === 'Preparing' && o.id !== id)
-        .reduce((s, o) => s + (o.items || []).reduce((qs, it) => qs + (it.qty || 0), 0), 0);
-      const o = list.find(x => x.id === id);
-      if (o && o.status === 'Received') {
-        o.status = 'Preparing';
-        o.prepRequestedAt = new Date().toISOString();
-        setLocal('demo_orders', list);
-        setOrders([...list]);
-      }
-      return { error: null, changed: true, aheadDrinks: ahead };
-    }
-    const { data, error } = await sb.rpc('request_order_prep', { p_id: id, p_phone: phone, p_token: token || null });
-    if (error) { noteSupabaseError('Requesting order prep', error); return { error }; }
-    return { error: null, changed: !!data?.changed, aheadDrinks: data?.aheadDrinks ?? 0 };
-  }, [sb, noteSupabaseError]);
+  // Live queue position for an order already 'Preparing' — callable
+  // anytime. Polled from the Orders page/the post-payment screen while an
+  // order sits in 'Preparing'.
+  const fetchQueuePosition = useCallback(async (orderId) => {
+    if (!sb || !orderId) return { preparing: false, aheadDrinks: null };
+    const { data, error } = await sb.rpc('get_queue_position', { p_order_id: orderId });
+    if (error) return { preparing: false, aheadDrinks: null };
+    return { preparing: !!data?.preparing, aheadDrinks: data?.aheadDrinks ?? null };
+  }, [sb]);
 
   const saveProfile = useCallback((profile) => {
     // Merge rather than replace — callers like CheckoutSheet only pass
@@ -505,9 +493,20 @@ export function MoochaProvider({ children }) {
     return { code: data };
   }, [noteSupabaseError]);
 
+  // Staff-only: same idea as generateClaimLink, but for connecting a walk-in
+  // customer's Telegram at the counter — staff being physically present is
+  // the proof of ownership the self-service generate_telegram_link_code
+  // can't assume (see 20260915090000_staff_telegram_link.sql).
+  const generateTelegramLinkStaff = useCallback(async (phone) => {
+    if (!sb) return { error: 'Connect Supabase to use this (see README.md)' };
+    const { data, error } = await sb.rpc('generate_telegram_link_code_staff', { p_phone: phone });
+    if (error) { noteSupabaseError('Generating Telegram link', error); return { error: error.message }; }
+    return { code: data };
+  }, [noteSupabaseError]);
+
   // Mints a 15-minute Telegram link code for the given phone (see
-  // generate_telegram_link_code) — used by TelegramLinkPrompt from both
-  // checkout and My Rewards.
+  // generate_telegram_link_code) — used by TelegramLinkPrompt from
+  // checkout, the post-payment screen, and the Orders page.
   const requestTelegramLink = useCallback(async (phone, token) => {
     if (!sb) return { error: "Telegram isn't set up yet - see README.md" };
     const { data, error } = await sb.rpc('generate_telegram_link_code', { p_phone: phone, p_token: token || null });
@@ -776,7 +775,7 @@ export function MoochaProvider({ children }) {
     // customer state
     tab, setTab, activeCat, setActiveCat,
     cart, cartSubtotal, addLineToCart, cartQty, updateLine, removeLine, clearCart,
-    myProfile, saveProfile, saveCustomerToken, myStamps, refreshMyLoyalty, fetchMyOrders, requestOrderPrep, claimRewards,
+    myProfile, saveProfile, saveCustomerToken, myStamps, refreshMyLoyalty, fetchMyOrders, fetchQueuePosition, claimRewards,
     freeUnitsByLineId, totalFreeUnits, redeemDiscount, cartTotalAfterRedeem,
     // shared state
     menu, setMenu, settings, setSettings, ordersOpen, orders, setOrders, customers, setCustomers,
@@ -789,7 +788,7 @@ export function MoochaProvider({ children }) {
     fetchOrders, fetchSettings, fetchMenuData, fetchCustomers,
     menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuSaveItem,
     persistSettings, setCollectionHours, deleteOrder, refundOrder, logWalkinOrder, markOrderCollected, markOrderPreparing, markOrderReady,
-    setCustomerStamps, deleteCustomerRecord, generateClaimLink, requestTelegramLink, fetchTelegramLinkStatus,
+    setCustomerStamps, deleteCustomerRecord, generateClaimLink, generateTelegramLinkStaff, requestTelegramLink, fetchTelegramLinkStatus,
     noteSupabaseError,
   };
 

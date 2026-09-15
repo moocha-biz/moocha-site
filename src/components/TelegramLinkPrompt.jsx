@@ -1,16 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMoocha } from '../store.jsx';
+import ActionCard from './ActionCard.jsx';
 
 const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME;
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_ATTEMPTS = 20; // ~1 minute
 
-// Shared by CheckoutSheet and LoyaltyView so the generate/deep-link/poll
-// logic for linking Telegram isn't duplicated between them. `phone` should
-// already be normalized (see CheckoutSheet) — orders/stamps are keyed by
-// the normalized phone, so linking against a raw, un-normalized value
-// would tie the Telegram link to a phone that never matches a real order.
-export default function TelegramLinkPrompt({ phone, token }) {
+// Shared by CheckoutSheet, PaymentResultModal, and OrdersView so the
+// generate/deep-link/poll logic for linking Telegram isn't duplicated
+// between them. `phone` should already be normalized (see CheckoutSheet)
+// — orders/stamps are keyed by the normalized phone, so linking against a
+// raw, un-normalized value would tie the Telegram link to a phone that
+// never matches a real order.
+//
+// `onStatus`, if given, is called with the current {linked, username} (or
+// null while unknown) every time it changes — lets a caller like
+// OrdersView gate its own UI (e.g. "Start preparing" requires Telegram) on
+// the same linked state this component already tracks, without
+// duplicating the fetch/poll logic.
+export default function TelegramLinkPrompt({ phone, token, onStatus }) {
   const { requestTelegramLink, fetchTelegramLinkStatus, showToast } = useMoocha();
   const [status, setStatus] = useState(null); // { linked, username } | null while loading
   const [linkUrl, setLinkUrl] = useState(null);
@@ -21,6 +29,8 @@ export default function TelegramLinkPrompt({ phone, token }) {
   useEffect(() => {
     return () => clearInterval(pollRef.current);
   }, []);
+
+  useEffect(() => { onStatus?.(status); }, [status, onStatus]);
 
   useEffect(() => {
     clearInterval(pollRef.current);
@@ -60,41 +70,36 @@ export default function TelegramLinkPrompt({ phone, token }) {
 
   if (status?.linked) {
     return (
-      <div className="field">
-        <div className="section-note" style={{ color: 'var(--green-dark)', fontWeight: 800 }}>
-          ✓ Telegram connected{status.username ? ` (@${status.username})` : ''}
-        </div>
-      </div>
+      <ActionCard tone="mint" title={`Telegram connected${status.username ? ` (@${status.username})` : ''}`} />
     );
   }
 
   return (
-    <div className="field">
-      {!linkUrl && (
-        <div className="section-note" style={{ marginBottom: 6 }}>
-          Get a Telegram DM the moment your order's ready for pickup — no need to keep checking back.
-        </div>
-      )}
+    <ActionCard
+      tone="telegram"
+      title="Get notified on Telegram"
+      description={!linkUrl ? "Enable Telegram connection to moocha bot to tell us when to prepare your order and receive notifications when your order is ready!" : undefined}
+    >
       {expired && (
-        <div className="sub" style={{ color: 'var(--brand)', marginBottom: 8 }}>
+        <div className="sub" style={{ marginBottom: 10 }}>
           Link expired without connecting. Try again?
         </div>
       )}
       {!linkUrl ? (
-        <button type="button" className="btn-secondary" style={{ marginBottom: 0 }} disabled={generating} onClick={connect}>
-          {generating ? 'Generating…' : expired ? '🔔 Connect Telegram again' : '🔔 Connect Telegram'}
+        <button type="button" className="btn-telegram" disabled={generating} onClick={connect}>
+          {generating ? 'Generating…' : expired ? 'Connect again' : 'Connect Telegram'}
         </button>
       ) : (
         <>
-          <a className="btn-secondary" style={{ marginBottom: 0, display: 'block', textAlign: 'center', textDecoration: 'none' }} href={linkUrl} target="_blank" rel="noreferrer">
+          <a className="btn-telegram" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }} href={linkUrl} target="_blank" rel="noreferrer">
             Open Telegram to finish connecting →
           </a>
-          <div className="sub" style={{ color: 'var(--brand)', marginTop: 8, display: 'flex', alignItems: 'center' }}>
+          <div className="sub" style={{ marginTop: 10, display: 'flex', alignItems: 'center' }}>
             <span className="pulse-dot" />
             Waiting for you to tap "Start" in Telegram…
           </div>
         </>
       )}
-    </div>
+    </ActionCard>
   );
 }

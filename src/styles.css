@@ -71,6 +71,30 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .closed-banner .heading{ font-size:18px; color:#b5563f; margin-bottom:4px;}
 .closed-banner div.sub{ font-size:13px; color:#8a5646; font-weight:600;}
 
+/* One boxed-prompt shape reused everywhere a short explanation leads to one
+   action (start preparing, connect Telegram, a status update) — same
+   padding/radius rhythm as .closed-banner above so a screen stacking
+   several of these (see PaymentResultModal) reads as one consistent
+   system instead of a different button/text style per prompt. */
+.action-card{ border-radius:var(--r-lg); padding:20px 18px; text-align:center; margin-top:12px;}
+.action-card-head{ display:flex; align-items:center; justify-content:center; gap:8px; font-family:'Baloo 2'; font-weight:800; font-size:15.5px; margin-bottom:6px;}
+.action-card-icon{ font-size:19px; line-height:1;}
+.action-card-desc{ font-size:12.5px; font-weight:600; line-height:1.55; margin-bottom:14px;}
+.action-card-desc:last-child{ margin-bottom:0;}
+.action-card .btn-primary, .action-card .btn-secondary, .action-card .btn-telegram{ margin-top:0;}
+.action-card .btn-secondary{ background:var(--paper);}
+
+.action-card.tone-mint{ background:var(--mint);}
+.action-card.tone-mint .action-card-head, .action-card.tone-mint .action-card-desc{ color:var(--green-dark);}
+
+.action-card.tone-amber{ background:var(--card-yellow);}
+.action-card.tone-amber .action-card-head, .action-card.tone-amber .action-card-desc{ color:#8a5b05;}
+
+.action-card .sub{ font-size:12.5px; font-weight:600; display:flex; align-items:center; justify-content:center;}
+
+.action-card.tone-telegram{ background:#EAF6FC;}
+.action-card.tone-telegram .action-card-head, .action-card.tone-telegram .action-card-desc, .action-card.tone-telegram .sub{ color:#146a94;}
+
 .tabbar{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:460px; background:var(--cream2); border-top:2px solid var(--mint); display:flex; justify-content:space-around; padding:10px 8px 16px 8px; z-index:30;}
 .tabitem{ display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; border-radius:16px; color:#a9bfa2; cursor:pointer; font-family:'Baloo 2'; font-size:11px; font-weight:700; padding:6px 16px; position:relative;}
 .tabitem.active{ color:var(--green-dark);}
@@ -112,6 +136,12 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .sheet-item-thumb .item-thumb img{ object-fit:contain; }
 .sheet-float-close{ position:absolute; top:14px; right:14px; z-index:20; width:32px;height:32px; border-radius:50%; border:none; background:rgba(0,0,0,0.4); color:#fff; font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; }
 .sheet-float-close:hover{ background:rgba(0,0,0,0.55); }
+/* .card-modal insets the sheet 20px horizontally from sheet-wrap's own
+   edge (margin: 0 20px — vertical margin stays 0, so top doesn't need
+   adjusting). This button is positioned relative to sheet-wrap, not the
+   sheet, so its right offset needs that same 20px added or it floats past
+   the card's actual corner instead of sitting on it. */
+.sheet-float-close.card-modal-close{ right:34px; }
 @keyframes sheetup{ from{transform:translateY(30px); opacity:0;} to{transform:translateY(0); opacity:1;} }
 .sheet-close{ width:40px;height:6px;background:var(--mint-deep); border-radius:999px; margin:0 auto 14px auto;}
 .sheet-title{ font-family:'Baloo 2'; font-size:23px; font-weight:800; margin-bottom:2px; color:var(--green-dark);}
@@ -142,6 +172,12 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .btn-primary:disabled{ background:#cdd8c9; box-shadow:0 5px 0 #b9c4b5; cursor:not-allowed;}
 .btn-secondary{ width:100%; background:transparent; color:var(--green); border:2px solid var(--mint-deep); padding:13px; border-radius:18px; font-weight:700; font-family:'Baloo 2'; font-size:14px; cursor:pointer; margin-top:8px;}
 .btn-secondary:disabled{ color:#a9bfa2; border-color:#e3ebe0; cursor:not-allowed;}
+/* Distinct branded style for Telegram-connect specifically — it's an
+   account-linking action, not an order action, and sharing btn-secondary's
+   generic look with buttons like "start preparing" made it read as just
+   another order step instead of a separate integration. */
+.btn-telegram{ width:100%; background:#229ED9; color:#fff; border:none; padding:13px; border-radius:18px; font-weight:700; font-family:'Baloo 2'; font-size:14px; cursor:pointer; margin-top:8px;}
+.btn-telegram:disabled{ background:#a9d4e8; cursor:not-allowed;}
 
 .cart-line{ background:var(--paper); border-radius:20px; padding:14px; margin-bottom:10px; box-shadow:var(--shadow);}
 .cart-line-top{ display:flex; justify-content:space-between; font-family:'Baloo 2'; font-weight:700; font-size:15px;}
@@ -224,9 +260,11 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .stamp-card-face-inner .reward-banner{ position:absolute; left:10%; bottom:2.5%; width:80%; z-index:1;}
 .reward-banner{ margin-top:14px; background:var(--sun); color:#6b4c05; font-weight:800; font-family:'Baloo 2'; font-size:clamp(11px,2.2vw,13px); padding:9px 14px; border-radius:14px; text-align:center; position:relative; z-index:1;}
 .order-row{ background:var(--paper); border-radius:16px; padding:13px 14px; margin-bottom:9px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow); border-left:4px solid transparent;}
-.order-row.pending-walkin{ border-left-color:var(--sun-deep); background:#FFFBF0;}
-.order-row.pending-preorder{ border-left-color:var(--green); background:#F3F9F0;}
-.order-row.preparing-now{ border-left-color:var(--card-yellow); background:#FFFCEF;}
+/* One "not started yet" color, not two — the walk-in-vs-preorder
+   distinction is already shown via the "Walk-in"/"Preorder" text label on
+   each row, so a separate color per type was redundant, not informative. */
+.order-row.pending{ border-left-color:var(--sun-deep); background:#FFFBF0;}
+.order-row.preparing-now{ border-left-color:var(--mint-deep); background:#F3F9EC;}
 .order-row.ready-pickup{ border-left-color:var(--lilac); background:#FDF3FE;}
 .order-row-left .oid{ font-size:11px; color:var(--brand); font-weight:700;}
 .order-row-left .oitems{ font-size:13px; font-weight:800; margin-top:2px; font-family:'Baloo 2';}
@@ -235,7 +273,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .order-status{ font-size:9.5px; font-weight:800; padding:2px 9px; border-radius:999px; background:var(--mint); color:var(--green-dark); text-transform:uppercase; margin-top:4px; display:inline-block;}
 .order-status.status-refunded{ background:var(--blush); color:#8a3a2a;}
 .order-status.status-failed{ background:#e8e8e8; color:#6b6b6b;}
-.order-status.status-preparing{ background:var(--card-yellow); color:#8a5b05;}
+.order-status.status-preparing{ background:var(--mint-deep); color:var(--green-dark);}
 
 .qr-box{ background:#fff; padding:18px; border-radius:20px; display:flex; justify-content:center; margin:6px 0 14px 0; box-shadow: var(--shadow);}
 .pay-amount{ text-align:center; font-family:'Baloo 2'; font-size:30px; font-weight:800; color:var(--green-dark); margin-bottom:2px;}

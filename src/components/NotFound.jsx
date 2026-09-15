@@ -11,7 +11,7 @@ export default function NotFound() {
     }}>
       <div>
         <div style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 22, fontWeight: 800, color: 'var(--green-dark)', marginBottom: 8 }}>
-          nothing here 🍃
+          nothing here
         </div>
         <div style={{ fontSize: 14, color: 'var(--brand)', marginBottom: 22, maxWidth: 320 }}>
           This page doesn't exist - but the menu does.

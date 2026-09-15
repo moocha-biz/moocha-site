@@ -10,6 +10,10 @@ export default function TabBar() {
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
         Menu
       </button>
+      <button className={`tabitem ${tab === 'orders' ? 'active' : ''}`} onClick={() => setTab('orders')}>
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M6 3h12v18l-2.5-1.5L13 21l-2.5-1.5L8 21l-2-1.5V3z" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" /><path d="M9 8h6M9 12h6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
+        Orders
+      </button>
       <button className={`tabitem ${tab === 'loyalty' ? 'active' : ''}`} onClick={() => setTab('loyalty')}>
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M12 21s-7-4.35-9.5-8.5C.8 8.6 3 5 6.5 5c2 0 3.4 1.1 4 2.2C11.1 6.1 12.5 5 14.5 5 18 5 20.2 8.6 18.5 12.5 16 16.65 12 21 12 21z" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" /></svg>
         Rewards

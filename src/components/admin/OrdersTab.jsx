@@ -27,7 +27,7 @@ export default function OrdersTab() {
   const [dateFilter, setDateFilter] = useState('');
 
   const q = query.trim().toLowerCase();
-  const filtered = orders.filter(o => {
+  let filtered = orders.filter(o => {
     if (typeFilter !== 'all' && (o.orderType || 'preorder') !== typeFilter) return false;
     if (statusFilter !== 'all' && o.status !== statusFilter) return false;
     if (dateFilter && toLocalDateStr(o.date) !== dateFilter) return false;
@@ -35,21 +35,41 @@ export default function OrdersTab() {
     const haystack = [o.id, o.name, o.phone, ...(o.items || []).map(i => i.name)].join(' ').toLowerCase();
     return haystack.includes(q);
   });
+  // Viewing the Preparing queue specifically reads as a worklist, not a
+  // log — oldest request first (next to hand off) instead of the usual
+  // newest-order-first ordering everywhere else.
+  if (statusFilter === 'Preparing') {
+    filtered = [...filtered].sort((a, b) => new Date(a.prepRequestedAt) - new Date(b.prepRequestedAt));
+  }
 
   const pendingWalkins = orders.filter(o => o.status === 'Received' && o.orderType === 'walkin').length;
   const pendingPreorders = orders.filter(o => o.status === 'Received' && o.orderType !== 'walkin').length;
   const preparingNow = orders.filter(o => o.status === 'Preparing').length;
   const readyForPickup = orders.filter(o => o.status === 'Ready').length;
-  // Ready means "waiting on the customer", not "staff needs to act" like the
-  // Received-only pending-* highlights below, so it gets its own class.
-  // Preparing means "the customer just asked staff to start now" — the
-  // highest-urgency state, so it gets its own class too.
+  // Ready means "waiting on the customer", not "staff needs to act" like
+  // pending below, so it gets its own class. Preparing means "the customer
+  // just asked staff to start now" — the highest-urgency state, its own
+  // class too. Walk-in vs. preorder no longer gets a separate pending
+  // color — that distinction is already shown via the "Walk-in"/"Preorder"
+  // text label on each row, so splitting the color too was redundant.
   const rowClass = (o) => {
     if (o.status === 'Preparing') return 'preparing-now';
     if (o.status === 'Ready') return 'ready-pickup';
     if (o.status !== 'Received') return '';
-    return o.orderType === 'walkin' ? 'pending-walkin' : 'pending-preorder';
+    return 'pending';
   };
+
+  // Queue position (#1 = next to hand off), computed from the full,
+  // unfiltered order list so it stays correct regardless of what's
+  // currently searched/filtered, and always agrees with the same
+  // prep_requested_at ordering get_queue_position uses for the
+  // customer/bot-facing "N drinks ahead of you" count.
+  const preparingQueuePosition = new Map(
+    orders
+      .filter(o => o.status === 'Preparing')
+      .sort((a, b) => new Date(a.prepRequestedAt) - new Date(b.prepRequestedAt))
+      .map((o, i) => [o.id, i + 1])
+  );
 
   // Exports exactly what's currently filtered/searched — "today's walk-ins"
   // or "this week's preorders" just works by filtering first, then
@@ -99,21 +119,21 @@ export default function OrdersTab() {
         <div className="stat-grid" style={{ marginBottom: 14 }}>
           <div className="stat-card" style={{ borderLeft: '4px solid var(--sun-deep)' }}>
             <div className="stat-num">{pendingWalkins}</div>
-            <div className="stat-label">🚶 walk-in{pendingWalkins === 1 ? '' : 's'} waiting</div>
+            <div className="stat-label">walk-in{pendingWalkins === 1 ? '' : 's'} waiting</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '4px solid var(--green)' }}>
             <div className="stat-num">{pendingPreorders}</div>
-            <div className="stat-label">📦 preorder{pendingPreorders === 1 ? '' : 's'} to collect</div>
+            <div className="stat-label">preorder{pendingPreorders === 1 ? '' : 's'} to collect</div>
           </div>
           {preparingNow > 0 && (
             <div className="stat-card" style={{ borderLeft: '4px solid var(--card-yellow)' }}>
               <div className="stat-num">{preparingNow}</div>
-              <div className="stat-label">🔥 asked to start prep</div>
+              <div className="stat-label">asked to start prep</div>
             </div>
           )}
           <div className="stat-card" style={{ borderLeft: '4px solid var(--lilac)' }}>
             <div className="stat-num">{readyForPickup}</div>
-            <div className="stat-label">🔔 ready for pickup</div>
+            <div className="stat-label">ready for pickup</div>
           </div>
         </div>
       )}
@@ -143,11 +163,14 @@ export default function OrdersTab() {
             <div className="oitems">{o.name} · {o.phone}</div>
             <div className="sub" style={{ fontSize: 12, color: 'var(--brand)', marginTop: 2 }}>{o.items.map(i => `${i.name} x${i.qty}`).join(', ')}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand)' }}>{o.orderType === 'walkin' ? '🚶 Walk-in' : '📦 Preorder'}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand)' }}>{o.orderType === 'walkin' ? 'Walk-in' : 'Preorder'}</span>
               <StatusBadge status={o.status} />
+              {o.status === 'Preparing' && preparingQueuePosition.has(o.id) && (
+                <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--green-dark)' }}>#{preparingQueuePosition.get(o.id)} in queue</span>
+              )}
               {o.stockAlert && (
                 <span title="This order was booked past the item's stock limit — likely oversold from concurrent checkouts. Review and consider a refund." style={{ fontSize: 11, fontWeight: 700, color: 'var(--sun-deep)' }}>
-                  ⚠️ Oversold
+                  Oversold
                 </span>
               )}
             </div>

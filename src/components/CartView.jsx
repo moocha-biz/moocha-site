@@ -11,7 +11,7 @@ export default function CartView({ onCheckout, onEditLine, compact = false }) {
     return (
       <div className="empty-state">
         <div className="heading">cart's empty!</div>
-        add a drink from the menu to get started 🌿
+        add a drink from the menu to get started
       </div>
     );
   }
@@ -22,7 +22,7 @@ export default function CartView({ onCheckout, onEditLine, compact = false }) {
     <>
       {totalFreeUnits > 0 && (
         <div className="section-note" style={{ color: 'var(--green-dark)', fontWeight: 800, marginBottom: 4 }}>
-          🎁 {totalFreeUnits} free drink{totalFreeUnits > 1 ? 's' : ''} applied below (cheapest items first)
+          {totalFreeUnits} free drink{totalFreeUnits > 1 ? 's' : ''} applied below (cheapest items first)
         </div>
       )}
       {cart.map(l => {
@@ -31,7 +31,7 @@ export default function CartView({ onCheckout, onEditLine, compact = false }) {
         return (
           <div className="cart-line" key={l.lineId}>
             <div className="cart-line-top"><span>{l.name}</span><span>{money(l.lineTotal - freeQty * (l.lineTotal / l.qty))}</span></div>
-            <div className="cart-line-opts">{[opts, freeQty > 0 ? `🎁 ${freeQty} free` : ''].filter(Boolean).join(' · ')}</div>
+            <div className="cart-line-opts">{[opts, freeQty > 0 ? `${freeQty} free` : ''].filter(Boolean).join(' · ')}</div>
             <div className="cart-line-bottom">
               <div className="mini-qty">
                 <button className="mini-btn" onClick={() => cartQty(l.lineId, -1)}>−</button>

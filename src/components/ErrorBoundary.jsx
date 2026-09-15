@@ -25,7 +25,7 @@ export default class ErrorBoundary extends React.Component {
       }}>
         <div>
           <div style={{ fontFamily: "'Baloo 2', sans-serif", fontSize: 22, fontWeight: 800, color: '#2F5233', marginBottom: 8 }}>
-            something went wrong 🍃
+            something went wrong
           </div>
           <div style={{ fontSize: 14, color: '#85A573', marginBottom: 22, maxWidth: 320 }}>
             Sorry about that - a refresh usually fixes it. Your cart is saved.

@@ -14,14 +14,14 @@ function OrderProgress({ status }) {
   if (status === 'Payment failed') {
     return (
       <div style={{ background: 'var(--blush)', color: '#8a3a2a', borderRadius: 14, padding: '12px 16px', marginBottom: 18, fontWeight: 800, fontFamily: "'Baloo 2'", textAlign: 'center', fontSize: 13 }}>
-        ⚠️ Payment failed - checkout was never completed
+        Payment failed - checkout was never completed
       </div>
     );
   }
   if (status === 'Refunded') {
     return (
       <div style={{ background: 'var(--blush)', color: '#8a3a2a', borderRadius: 14, padding: '12px 16px', marginBottom: 18, fontWeight: 800, fontFamily: "'Baloo 2'", textAlign: 'center', fontSize: 13 }}>
-        ↩️ Refunded
+        Refunded
       </div>
     );
   }
@@ -96,7 +96,7 @@ function PaymentField({ order }) {
   if (!order.stripeSessionId) {
     const isRedeemed = (order.items || []).some(it => it.redeemed);
     const label = isRedeemed
-      ? '🎁 Redeemed with stamps - no payment'
+      ? 'Redeemed with stamps - no payment'
       : order.orderType === 'walkin'
         ? 'Cash / no payment record (walk-in)'
         : 'No payment record';
@@ -113,7 +113,7 @@ function PaymentField({ order }) {
       <label>Payment</label>
       <div style={{ background: 'var(--paper)', border: '2px solid var(--line)', borderRadius: 14, padding: '12px 14px' }}>
         {loading && <div style={{ fontSize: 12.5, color: 'var(--brand)', fontWeight: 700, fontStyle: 'italic' }}>Checking Stripe…</div>}
-        {!loading && error && <div style={{ fontSize: 12.5, color: '#b5563f', fontWeight: 700 }}>⚠️ {error}</div>}
+        {!loading && error && <div style={{ fontSize: 12.5, color: '#b5563f', fontWeight: 700 }}>{error}</div>}
         {!loading && details && (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -129,7 +129,7 @@ function PaymentField({ order }) {
             <DetailRow label="Email" value={details.customerEmail} />
             <DetailRow label="Refunded" value={details.refunded ? money((details.amountRefunded || 0) / 100) : null} />
             <DetailRow label="Net after fees" value={details.netAmount != null ? `${money(details.netAmount / 100)} (fee ${money((details.feeAmount || 0) / 100)})` : null} />
-            {details.disputed && <DetailRow label="⚠️ Disputed" value="Yes" />}
+            {details.disputed && <DetailRow label="Disputed" value="Yes" />}
             <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
               {details.receiptUrl && <a className="edit-link" href={details.receiptUrl} target="_blank" rel="noreferrer">Receipt →</a>}
               <a className="edit-link" href={stripeDashboardUrl(order.stripeSessionId)} target="_blank" rel="noreferrer">Stripe Dashboard →</a>
@@ -298,28 +298,51 @@ export default function OrderDetailSheet({ order, onClose }) {
       <div className="section-label" style={{ marginTop: 10 }}>Items</div>
       {(order.items || []).map((it, i) => (
         <div className="summary-row" key={i}>
-          <span>{it.name}{it.sugar ? ` · ${it.sugar}` : ''} x{it.qty}{it.redeemed ? ` · 🎁 ${it.freeQty || 1} free` : ''}</span>
+          <span>{it.name}{it.sugar ? ` · ${it.sugar}` : ''} x{it.qty}{it.redeemed ? ` · ${it.freeQty || 1} free` : ''}</span>
           <span>{money(it.lineTotal)}</span>
         </div>
       ))}
       <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
 
-      {/* Walk-ins are handed over on the spot — no gap between "made" and
-          "picked up" for the Ready step to represent — so they keep the
-          original single "Mark collected" click. Only preorders (which sit
-          around waiting for the customer to come back) go through Ready. */}
-      {order.status === 'Received' && order.orderType === 'walkin' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
+      {/* Most walk-ins are handed straight over with no gap between "made"
+          and "picked up", so this direct skip stays available — but a
+          walk-in customer who's stepping away while it's made (see the
+          "Mark ready" button below, now offered for walk-ins too) needs
+          it, so it's no longer their only option. */}
+      {order.status === 'Received' && order.orderType === 'walkin' && (
+        <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>
+      )}
       {/* Staff can flip Received -> Preparing themselves for a customer who
           calls in or asks in person instead of tapping the app's own
           "prepare my drink" button — same status either way, just a
-          different starting point. Secondary, not primary, since staff
-          can still skip straight to "Mark ready" below without it. */}
+          different starting point. Walk-ins never go through Preparing
+          (their drink starts the moment it's logged, there's no advance
+          queue to join) — secondary, not primary, since staff can still
+          skip straight to "Mark ready" below without it. */}
       {order.status === 'Received' && order.orderType !== 'walkin' && (
         <button className="btn-secondary" style={{ marginTop: 16 }} disabled={startingPrep} onClick={startPreparing}>
           {startingPrep ? 'Marking preparing…' : 'Mark preparing (customer asked in person)'}
         </button>
       )}
-      {(order.status === 'Received' || order.status === 'Preparing') && order.orderType !== 'walkin' && <button className="btn-primary" style={{ marginTop: order.status === 'Received' ? 8 : 16 }} disabled={marking} onClick={ready}><span>{marking ? 'Marking ready…' : 'Mark ready'}</span><span>→</span></button>}
+      {/* Now available for walk-ins too, not just preorders — a walk-in
+          customer who wants to step away while their drink is made can be
+          notified over Telegram the same way a preorder customer is,
+          instead of only ever handed over directly via "Mark collected"
+          above. Secondary styling when shown alongside that direct-skip
+          button (walk-in, still Received) since it's the less common
+          choice there; primary on its own for a preorder, where it's the
+          only way forward from Received/Preparing. */}
+      {(order.status === 'Received' || order.status === 'Preparing') && (
+        order.status === 'Received' && order.orderType === 'walkin' ? (
+          <button className="btn-secondary" style={{ marginTop: 8 }} disabled={marking} onClick={ready}>
+            {marking ? 'Marking ready…' : 'Mark ready (notify when I step away)'}
+          </button>
+        ) : (
+          <button className="btn-primary" style={{ marginTop: order.status === 'Received' ? 8 : 16 }} disabled={marking} onClick={ready}>
+            <span>{marking ? 'Marking ready…' : 'Mark ready'}</span><span>→</span>
+          </button>
+        )
+      )}
       {order.status === 'Ready' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
       {canRefund && (
         <button className="btn-secondary" style={{ marginTop: 8, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>
