@@ -182,6 +182,26 @@ export function MoochaProvider({ children }) {
     setMenu(await fetchMenuData());
   }, [sb, menu, noteSupabaseError, fetchMenuData]);
 
+  // Swaps an item with its neighbor within the same category (see
+  // move_menu_item — it renumbers the category to a clean sequence first,
+  // so this works correctly even before anything's ever been reordered).
+  const menuMoveItem = useCallback(async (cat, id, direction) => {
+    if (!sb) {
+      const next = { categories: { ...menu.categories } };
+      const items = [...(next.categories[cat] || [])];
+      const idx = items.findIndex(i => i.id === id);
+      const swapWith = direction === 'up' ? idx - 1 : idx + 1;
+      if (idx === -1 || swapWith < 0 || swapWith >= items.length) return;
+      [items[idx], items[swapWith]] = [items[swapWith], items[idx]];
+      next.categories[cat] = items;
+      setMenu(next); setLocal('demo_menu', next);
+      return;
+    }
+    const { error } = await sb.rpc('move_menu_item', { p_item_id: id, p_direction: direction });
+    if (error) { noteSupabaseError('Reordering item', error); return; }
+    setMenu(await fetchMenuData());
+  }, [sb, menu, noteSupabaseError, fetchMenuData]);
+
   const menuToggleHidden = useCallback(async (cat, id) => {
     if (!sb) {
       const next = { categories: { ...menu.categories } };
@@ -805,7 +825,7 @@ export function MoochaProvider({ children }) {
     toast, showToast,
     // backend actions
     fetchOrders, fetchSettings, fetchMenuData, fetchCustomers,
-    menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuSaveItem,
+    menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuMoveItem, menuSaveItem,
     persistSettings, setCollectionHours, deleteOrder, refundOrder, logWalkinOrder, markOrderCollected, markOrderPreparing, markOrderReady,
     setCustomerStamps, deleteCustomerRecord, generateClaimLink, generateTelegramLinkStaff, requestTelegramLink, fetchTelegramLinkStatus,
     noteSupabaseError,
