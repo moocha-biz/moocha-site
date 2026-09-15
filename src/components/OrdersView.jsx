@@ -103,24 +103,25 @@ export default function OrdersView() {
       {ordersLoading ? (
         <div className="empty-state" style={{ padding: '20px 10px' }}>Loading your orders…</div>
       ) : myOrders.length ? myOrders.map(o => (
-        <div className="order-row" key={o.id} style={{ alignItems: 'flex-start' }}>
+        <div className="order-row" key={o.id}>
           <div className="order-row-left">
             <div className="oid">#{o.id}</div>
             <div className="oitems">{o.items.map(i => `${i.name}${i.sugar ? ` (${i.sugar})` : ''} x${i.qty}`).join(', ')}</div>
             <span className={`order-status ${o.status === 'Refunded' ? 'status-refunded' : o.status === 'Payment failed' ? 'status-failed' : o.status === 'Preparing' ? 'status-preparing' : ''}`}>{o.status}</span>
+          </div>
+          <div className="order-row-right">
+            <div className="oprice">{money(o.total)}</div>
             {o.status === 'Received' && o.orderType !== 'walkin' && (
               !telegramStatus?.linked ? (
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--brand)', marginTop: 6 }}>
-                  Connect Telegram above to start preparing your order
-                </div>
+                <div className="order-row-note">Connect Telegram above to start preparing your order</div>
               ) : !collectionOpen ? (
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--brand)', marginTop: 6 }}>
+                <div className="order-row-note">
                   {collectionWindow ? `You can ask staff to start on your order during collection hours: ${collectionWindow}.` : "You can ask staff to start on your order once collection hours open"}
                 </div>
               ) : (
                 <a
                   className="btn-secondary btn-compact"
-                  style={{ display: 'inline-block', marginTop: 8, marginBottom: 0, textDecoration: 'none' }}
+                  style={{ textDecoration: 'none', marginTop: 0 }}
                   href={`https://t.me/${BOT_USERNAME}?start=prep_${o.id}`}
                   target="_blank" rel="noreferrer"
                 >
@@ -129,12 +130,11 @@ export default function OrdersView() {
               )
             )}
             {o.status === 'Preparing' && o.aheadDrinks != null && (
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--brand)', marginTop: 6 }}>
+              <div className="order-row-note">
                 {o.aheadDrinks === 0 ? "You're next!" : `${o.aheadDrinks} drink${o.aheadDrinks === 1 ? '' : 's'} ahead of you`}
               </div>
             )}
           </div>
-          <div className="order-row-right"><div className="oprice">{money(o.total)}</div></div>
         </div>
       )) : <div className="empty-state" style={{ padding: '20px 10px' }}>No orders yet - place one from the menu</div>}
     </>
