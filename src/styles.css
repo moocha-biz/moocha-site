@@ -188,6 +188,20 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .remove-link{ font-size:11.5px; color:var(--blush-deep); font-weight:700; cursor:pointer;}
 .edit-link{ font-size:11.5px; color:var(--green-dark); font-weight:700; cursor:pointer;}
 
+/* Visually separates refund/delete from the primary workflow buttons
+   (mark ready/collected) above — a misclick between adjacent stacked
+   buttons is an easy mistake without a clear gap + divider here. */
+.order-danger-zone{ margin-top:24px; padding-top:16px; border-top:2px dashed var(--line);}
+.order-danger-zone > *:first-child{ margin-top:0;}
+
+/* Delete order is irreversible and needs a deliberate press-and-hold
+   (see OrderDetailSheet's remove()), so it's shrunk and muted relative to
+   "Partial refund…" above it — matching weight with that link made it too
+   easy to fat-finger on a small screen. It reddens only while held, as
+   feedback that the hold is registering. */
+.remove-link-hold{ font-size:10px; font-weight:600; color:#a9a49f; letter-spacing:0.1px; -webkit-user-select:none; user-select:none; touch-action:manipulation;}
+.remove-link-hold.holding{ color:var(--blush-deep);}
+
 .summary-row{ display:flex; justify-content:space-between; gap:8px; font-size:13.5px; padding:6px 0; color:#5b6e54; font-weight:700;}
 .summary-row.total{ font-family:'Baloo 2'; font-weight:800; font-size:17px; color:var(--green-dark); border-top:2px dashed var(--line); margin-top:6px; padding-top:12px;}
 .summary-row > span:first-child{ flex:1 1 auto; min-width:0; overflow-wrap:anywhere;}
@@ -207,6 +221,11 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .field.error input{ border-color:var(--blush-deep); background:#FFF7F5;}
 .field.error input:focus{ border-color:var(--blush-deep);}
 .field-error-msg{ font-size:12px; font-weight:700; color:#b5563f; margin-top:6px;}
+/* One compact line standing in for whichever of prep/ready/collected
+   haven't happened yet, instead of three near-identical "hasn't happened"
+   label+value fields stacked for an order that's still Received — see
+   OrderDetailSheet's timelineStages. */
+.field-status-pending{ font-size:12.5px; font-weight:700; color:#a9a49f; margin-bottom:14px;}
 
 .empty-state{ text-align:center; padding:40px 20px; color:var(--brand);}
 .empty-state .heading{ font-size:19px; color:var(--green-dark); margin-bottom:6px;}
