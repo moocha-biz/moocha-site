@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useLocation, useNavigate } from 'react-router-dom';
 import { sb } from './lib/supabaseClient.js';
 import { getLocal, setLocal } from './lib/storage.js';
+import { edgeFunctionErrorMessage } from './lib/edgeFunctionError.js';
 import {
   DEFAULT_MENU, DEFAULT_SETTINGS, DEFAULT_SUGAR_LEVELS, STAMP_GOAL,
   DEMO_PASSPHRASE_KEY, DEMO_DEFAULT_PASSPHRASE,
@@ -96,7 +97,7 @@ export function MoochaProvider({ children }) {
       status: r.status, orderType: r.order_type, collectedAt: r.collected_at, collectedBy: r.collected_by,
       readyAt: r.ready_at, readyBy: r.ready_by, prepRequestedAt: r.prep_requested_at, prepRequestedBy: r.prep_requested_by,
       stripeSessionId: r.stripe_session_id, refundedAt: r.refunded_at, refundedBy: r.refunded_by, refundId: r.refund_id,
-      stockAlert: r.stock_alert,
+      stockAlert: r.stock_alert, partialRefunds: r.partial_refunds || [],
     }));
   }, [noteSupabaseError]);
 
@@ -359,8 +360,9 @@ export function MoochaProvider({ children }) {
   // only place that can actually call stripe.refunds.create, since only it
   // holds the Stripe secret key); cash/walk-in orders have no Stripe
   // payment to reverse, so they call refund_order() directly instead.
-  const refundOrder = useCallback(async (order) => {
+  const refundOrder = useCallback(async (order, { amount, reason } = {}) => {
     if (!sb) {
+      if (amount != null) return { error: "Partial refunds aren't available in demo mode" };
       const list = getLocal('demo_orders', []);
       const o = list.find(x => x.id === order.id);
       if (o && (o.status === 'Received' || o.status === 'Collected')) {
@@ -372,13 +374,20 @@ export function MoochaProvider({ children }) {
       return { error: null };
     }
     if (order.stripeSessionId) {
-      const { data, error } = await sb.functions.invoke('refund-order', { body: { orderId: order.id } });
+      // requestId makes the edge function's idempotency key unique per
+      // button-press for a partial refund — several can legitimately
+      // happen for the same order, unlike a full refund.
+      const body = amount != null
+        ? { orderId: order.id, amount, reason, requestId: 'req_' + Date.now().toString(36) }
+        : { orderId: order.id };
+      const { data, error } = await sb.functions.invoke('refund-order', { body });
       if (error || data?.error) {
-        const message = data?.error || error?.message || 'Refund failed';
+        const message = await edgeFunctionErrorMessage(data, error, 'Refund failed');
         noteSupabaseError('Refunding order', { message });
         return { error: message };
       }
     } else {
+      if (amount != null) return { error: 'This order has no Stripe payment to partially refund' };
       const { error } = await sb.rpc('refund_order', { p_id: order.id });
       if (error) { noteSupabaseError('Refunding order', error); return { error: error.message }; }
     }

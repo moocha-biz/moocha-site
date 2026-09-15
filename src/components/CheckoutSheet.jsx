@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMoocha } from '../store.jsx';
 import { money } from '../lib/storage.js';
+import { edgeFunctionErrorMessage } from '../lib/edgeFunctionError.js';
 import { normalizeSgPhone } from '../lib/phone.js';
 import { formatCollectionWindow } from '../lib/pickup.js';
 import { fireConfetti } from './Confetti.jsx';
@@ -43,7 +44,7 @@ export default function CheckoutSheet({ onClose }) {
       },
     });
     if (error || data?.error || !data?.order) {
-      showToast(data?.error || error?.message || "Couldn't place your order - check your connection and try again");
+      showToast(await edgeFunctionErrorMessage(data, error, "Couldn't place your order - check your connection and try again"));
       setBusy(false);
       return;
     }
@@ -100,12 +101,12 @@ export default function CheckoutSheet({ onClose }) {
       });
       if (error || !data?.url) {
         console.error(error);
-        // data?.error carries a specific reason when the server actually
-        // rejected the request (e.g. a stock-limit message) — only fall
-        // back to a generic network-ish message when there isn't one, so
-        // this never falsely claims PayNow "isn't set up" for what's
+        // edgeFunctionErrorMessage carries a specific reason when the server
+        // actually rejected the request (e.g. a stock-limit message) — only
+        // falls back to a generic network-ish message when there isn't one,
+        // so this never falsely claims PayNow "isn't set up" for what's
         // really a dropped connection or a one-off server hiccup.
-        showToast(data?.error || "Couldn't start checkout - check your connection and try again");
+        showToast(await edgeFunctionErrorMessage(data, error, "Couldn't start checkout - check your connection and try again"));
         setBusy(false);
         return;
       }

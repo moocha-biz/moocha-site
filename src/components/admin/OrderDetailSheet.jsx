@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMoocha } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
+import { edgeFunctionErrorMessage } from '../../lib/edgeFunctionError.js';
 import StatusBadge, { Badge } from './StatusBadge.jsx';
 
 // A paid/logged order only ever exists as a row once payment (or the
@@ -83,9 +84,9 @@ function PaymentField({ order }) {
     if (!sb || !order.stripeSessionId) { setLoading(false); return; }
     setLoading(true);
     setError(null);
-    sb.functions.invoke('get-order-payment', { body: { orderId: order.id } }).then(({ data, error: err }) => {
+    sb.functions.invoke('get-order-payment', { body: { orderId: order.id } }).then(async ({ data, error: err }) => {
       if (cancelled) return;
-      if (err || data?.error) { setError(data?.error || err?.message || 'Could not load Stripe details'); }
+      if (err || data?.error) { setError(await edgeFunctionErrorMessage(data, err, 'Could not load Stripe details')); }
       else setDetails(data);
       setLoading(false);
     });
@@ -199,6 +200,24 @@ export default function OrderDetailSheet({ order, onClose }) {
     onClose();
   };
 
+  // A specific amount (e.g. one missing item) rather than voiding the whole
+  // order — doesn't touch status/stamps/stock, see refund-order/index.ts.
+  // Doesn't close the sheet after, since the order's still active and staff
+  // may want to see the updated refund history right away.
+  const partialRefund = async () => {
+    const raw = window.prompt(`Partial refund amount for order #${order.id} (max ${money(order.total)}):`);
+    if (raw == null) return;
+    const amount = parseFloat(raw);
+    if (!Number.isFinite(amount) || amount <= 0) { showToast('Enter a valid amount'); return; }
+    const reason = window.prompt('Reason (optional, shown in the order history):') || '';
+    if (!window.confirm(`Really refund ${money(amount)} via Stripe for order #${order.id}? This can't be undone.`)) return;
+    setRefunding(true);
+    const { error } = await refundOrder(order, { amount, reason });
+    setRefunding(false);
+    if (error) { showToast(error); return; }
+    showToast(`${money(amount)} refunded ✓`);
+  };
+
   return (
     <>
       <div className="sheet-close" />
@@ -251,6 +270,24 @@ export default function OrderDetailSheet({ order, onClose }) {
             {order.refundedBy ? ` · ${order.refundedBy}` : ''}
             {order.refundId ? ` · ${order.refundId}` : ''}
           </div>
+        </div>
+      )}
+
+      {/* Independent of status - a partially refunded order stays
+          Received/Preparing/Ready/Collected, only a full refund flips it
+          to Refunded (see refund-order/index.ts). */}
+      {(order.partialRefunds || []).length > 0 && (
+        <div className="field">
+          <label>Partial refunds</label>
+          {order.partialRefunds.map((pr, i) => (
+            <div className="admin-item-name" key={i} style={{ fontSize: 12.5, wordBreak: 'break-all', marginBottom: 4 }}>
+              {money(pr.amount)}{pr.reason ? ` — ${pr.reason}` : ''}
+              <br />
+              {pr.refundedAt ? new Date(pr.refundedAt).toLocaleString() : ''}
+              {pr.refundedBy ? ` · ${pr.refundedBy}` : ''}
+              {pr.refundId ? ` · ${pr.refundId}` : ''}
+            </div>
+          ))}
         </div>
       )}
 
@@ -311,6 +348,11 @@ export default function OrderDetailSheet({ order, onClose }) {
         <button className="btn-secondary" style={{ marginTop: 8, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>
           {refunding ? 'Refunding…' : order.stripeSessionId ? 'Refund via Stripe' : isRedeemed ? 'Cancel & refund stamps' : 'Mark refunded (cash)'}
         </button>
+      )}
+      {canRefund && order.stripeSessionId && (
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
+          <span className="edit-link" onClick={partialRefund}>Partial refund…</span>
+        </div>
       )}
       {/* A small text link, not a full-width button like refund — delete is
           rare and destructive, and shouldn't share visual weight with the
