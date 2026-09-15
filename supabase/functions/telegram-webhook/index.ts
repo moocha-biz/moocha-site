@@ -217,6 +217,10 @@ Deno.serve(async (req) => {
     });
 
     if (error) {
+      if (error.message === "already_linked_elsewhere") {
+        await sendTelegramMessage(chatId, "This Telegram account is already linked to a different phone number — ask staff to clear the old link first.");
+        return new Response("ok", { status: 200 });
+      }
       console.error("redeem_telegram_link_code failed:", error);
       await sendTelegramMessage(chatId, "Something went wrong linking your account — please try the link again.");
       return new Response("ok", { status: 200 });
