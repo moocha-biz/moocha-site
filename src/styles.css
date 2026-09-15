@@ -256,6 +256,17 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .admin-tab{ flex:1; padding:13px 10px; text-align:center; background:none; border:none; font-family:'Baloo 2'; font-weight:700; font-size:12.5px; color:#93a88d; cursor:pointer; white-space:nowrap; border-bottom:3px solid transparent;}
 .admin-tab.active{ color:var(--green-dark); border-bottom-color:var(--green);}
 .admin-main{ padding:18px 20px 60px 20px; flex:1;}
+/* Would be position:sticky, but #adminApp needs overflow:hidden for its
+   rounded corners at the desktop breakpoint below, and that silently
+   breaks sticky positioning for anything inside it (a real, verified
+   issue, not a theoretical one - overflow:hidden makes #adminApp the
+   "nearest scroll container" for sticky purposes, but #adminApp itself
+   never scrolls, so the nav just scrolls away with everything else).
+   Plain jump links instead - still useful for a long menu, just not
+   persistently visible. */
+.admin-cat-nav{ display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:10px -20px 4px -20px; padding:8px 20px; background:var(--cream2); border-bottom:2px solid var(--mint);}
+.admin-cat-nav::-webkit-scrollbar{ display:none;}
+.admin-cat-anchor{ scroll-margin-top:12px;}
 .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px;}
 .stat-card{ background:var(--paper); border-radius:18px; padding:14px; box-shadow:var(--shadow);}
 .stat-card.primary{ background:var(--mint); border:2px solid var(--mint-deep);}
@@ -281,9 +292,19 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .admin-item-row{ background:var(--paper); border-radius:16px; padding:13px 14px; margin-bottom:9px; box-shadow:var(--shadow);}
 .admin-item-top{ display:flex; justify-content:space-between; align-items:center;}
 .admin-item-name{ font-weight:800; font-family:'Baloo 2';}
-.admin-item-actions{ display:flex; gap:8px;}
-.icon-btn{ background:var(--mint); border:none; border-radius:9px; width:30px;height:30px; cursor:pointer; font-weight:800; color:var(--green-dark);}
+.admin-item-actions{ display:flex; align-items:center; gap:8px;}
+.icon-btn{ display:flex; align-items:center; justify-content:center; background:var(--mint); border:none; border-radius:9px; width:30px;height:30px; cursor:pointer; font-weight:800; color:var(--green-dark);}
 .icon-btn.danger{ background:var(--blush); color:#b5563f;}
+/* Category delete sits alone in a section header, not shoulder-to-shoulder
+   with routine actions like the item row's trash button - but deleting a
+   category takes every item in it with it, so it stays muted until you
+   deliberately go for it instead of drawing the eye as a permanent red pill. */
+.icon-btn.category-delete{ width:24px; height:24px; background:transparent; color:var(--brand); opacity:0.55; transition: background .15s ease, color .15s ease, opacity .15s ease;}
+.icon-btn.category-delete:hover, .icon-btn.category-delete:focus-visible{ background:var(--blush); color:#b5563f; opacity:1;}
+/* Extra breathing room + a visible seam before a destructive action sitting
+   right next to routine ones (edit/sold-out/hide) - so a mis-tap on a
+   crowded row, especially on a touchscreen at the counter, is less likely. */
+.icon-btn-divider{ width:1px; align-self:stretch; margin:2px 2px; background:var(--line);}
 .toggle{ position:relative; width:46px;height:26px; border-radius:999px; background:#d7ddd3; cursor:pointer; flex-shrink:0;}
 .toggle:focus-visible{ outline:2px solid var(--green); outline-offset:2px;}
 .toggle.on{ background:var(--green);}
@@ -377,6 +398,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
   /* admin dashboard gets more breathing room too */
   #adminApp{ max-width:900px; border-radius:28px; margin:0 auto; box-shadow:0 20px 60px rgba(47,82,51,0.12); overflow:hidden; }
   .admin-main{ padding:26px 36px 60px 36px; }
+  .admin-cat-nav{ margin:10px -36px 4px -36px; padding:8px 36px; }
   .stat-grid{ grid-template-columns:repeat(4,1fr); }
 }
 
