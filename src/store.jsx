@@ -743,6 +743,25 @@ export function MoochaProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
+  // Live-refreshes the Orders list the moment any order changes — a new
+  // preorder/walk-in placed, a customer requesting prep via Telegram, a
+  // status update, a refund — instead of only ever updating on a manual
+  // "Refresh" click. Only orders are refetched (not the full
+  // refreshAdminData sweep) since nothing else changes from an order
+  // event. Needs `orders` added to the supabase_realtime publication (see
+  // 20260915120000_realtime_orders.sql) — RLS on orders already governs
+  // which rows this subscription can see, same as any other read.
+  useEffect(() => {
+    if (!isAdmin || !sb) return;
+    const channel = sb
+      .channel('admin-orders-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+        setOrders(await fetchOrders());
+      })
+      .subscribe();
+    return () => { sb.removeChannel(channel); };
+  }, [isAdmin, fetchOrders]);
+
   const logOut = useCallback(async () => {
     if (sb) await sb.auth.signOut();
     navigate('/admin');
