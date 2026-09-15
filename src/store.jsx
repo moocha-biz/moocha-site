@@ -182,6 +182,26 @@ export function MoochaProvider({ children }) {
     setMenu(await fetchMenuData());
   }, [sb, menu, noteSupabaseError, fetchMenuData]);
 
+  // Swaps an item with its neighbor within the same category (see
+  // move_menu_item — it renumbers the category to a clean sequence first,
+  // so this works correctly even before anything's ever been reordered).
+  const menuMoveItem = useCallback(async (cat, id, direction) => {
+    if (!sb) {
+      const next = { categories: { ...menu.categories } };
+      const items = [...(next.categories[cat] || [])];
+      const idx = items.findIndex(i => i.id === id);
+      const swapWith = direction === 'up' ? idx - 1 : idx + 1;
+      if (idx === -1 || swapWith < 0 || swapWith >= items.length) return;
+      [items[idx], items[swapWith]] = [items[swapWith], items[idx]];
+      next.categories[cat] = items;
+      setMenu(next); setLocal('demo_menu', next);
+      return;
+    }
+    const { error } = await sb.rpc('move_menu_item', { p_item_id: id, p_direction: direction });
+    if (error) { noteSupabaseError('Reordering item', error); return; }
+    setMenu(await fetchMenuData());
+  }, [sb, menu, noteSupabaseError, fetchMenuData]);
+
   const menuToggleHidden = useCallback(async (cat, id) => {
     if (!sb) {
       const next = { categories: { ...menu.categories } };
@@ -743,6 +763,25 @@ export function MoochaProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
+  // Live-refreshes the Orders list the moment any order changes — a new
+  // preorder/walk-in placed, a customer requesting prep via Telegram, a
+  // status update, a refund — instead of only ever updating on a manual
+  // "Refresh" click. Only orders are refetched (not the full
+  // refreshAdminData sweep) since nothing else changes from an order
+  // event. Needs `orders` added to the supabase_realtime publication (see
+  // 20260915120000_realtime_orders.sql) — RLS on orders already governs
+  // which rows this subscription can see, same as any other read.
+  useEffect(() => {
+    if (!isAdmin || !sb) return;
+    const channel = sb
+      .channel('admin-orders-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+        setOrders(await fetchOrders());
+      })
+      .subscribe();
+    return () => { sb.removeChannel(channel); };
+  }, [isAdmin, fetchOrders]);
+
   const logOut = useCallback(async () => {
     if (sb) await sb.auth.signOut();
     navigate('/admin');
@@ -786,7 +825,7 @@ export function MoochaProvider({ children }) {
     toast, showToast,
     // backend actions
     fetchOrders, fetchSettings, fetchMenuData, fetchCustomers,
-    menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuSaveItem,
+    menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuMoveItem, menuSaveItem,
     persistSettings, setCollectionHours, deleteOrder, refundOrder, logWalkinOrder, markOrderCollected, markOrderPreparing, markOrderReady,
     setCustomerStamps, deleteCustomerRecord, generateClaimLink, generateTelegramLinkStaff, requestTelegramLink, fetchTelegramLinkStatus,
     noteSupabaseError,
