@@ -149,7 +149,11 @@ export default function OrderDetailSheet({ order, onClose }) {
   const [refunding, setRefunding] = React.useState(false);
   const [marking, setMarking] = React.useState(false);
   const [startingPrep, setStartingPrep] = React.useState(false);
+  const [holdingDelete, setHoldingDelete] = React.useState(false);
+  const deleteHoldTimer = React.useRef(null);
   const canRefund = order.status === 'Received' || order.status === 'Preparing' || order.status === 'Ready' || order.status === 'Collected';
+
+  React.useEffect(() => () => clearTimeout(deleteHoldTimer.current), []);
 
   const NOTIFY_SKIP_REASONS = {
     'no phone': 'Marked ready - no phone on file, let them know in person',
@@ -184,6 +188,21 @@ export default function OrderDetailSheet({ order, onClose }) {
     await deleteOrder(order.id);
     showToast('Order deleted ✓');
     onClose();
+  };
+
+  // Delete is irreversible, so a plain tap isn't enough on mobile where it's
+  // easy to fat-finger next to "Partial refund…" — hold ~550ms to arm it,
+  // then the window.confirm above is the final safety net.
+  const startDeleteHold = () => {
+    setHoldingDelete(true);
+    deleteHoldTimer.current = setTimeout(() => {
+      setHoldingDelete(false);
+      remove();
+    }, 550);
+  };
+  const cancelDeleteHold = () => {
+    clearTimeout(deleteHoldTimer.current);
+    setHoldingDelete(false);
   };
 
   const isRedeemed = (order.items || []).some(it => it.redeemed);
@@ -236,29 +255,34 @@ export default function OrderDetailSheet({ order, onClose }) {
         <div className="admin-item-name">{new Date(order.date).toLocaleString()}</div>
       </div>
 
-      <div className="field">
-        <label>Prep requested at</label>
-        <div className="admin-item-name">
-          {order.prepRequestedAt ? new Date(order.prepRequestedAt).toLocaleString() : 'not requested yet'}
-          {order.prepRequestedBy ? ` · ${order.prepRequestedBy}` : order.prepRequestedAt ? ' · by customer' : ''}
-        </div>
-      </div>
-
-      <div className="field">
-        <label>Ready at</label>
-        <div className="admin-item-name">
-          {order.readyAt ? new Date(order.readyAt).toLocaleString() : 'not yet ready'}
-          {order.readyBy ? ` · ${order.readyBy}` : ''}
-        </div>
-      </div>
-
-      <div className="field">
-        <label>Collected at</label>
-        <div className="admin-item-name">
-          {order.collectedAt ? new Date(order.collectedAt).toLocaleString() : 'not yet collected'}
-          {order.collectedBy ? ` · ${order.collectedBy}` : ''}
-        </div>
-      </div>
+      {/* Stages up to and including the last one that actually happened get
+          their own full label+timestamp field; a skipped earlier stage
+          (e.g. a walk-in never has "prep requested") is just omitted, not
+          shown as pending. Everything after that last-completed point is
+          still pending by definition (they're sequential) and would
+          otherwise be three near-identical "hasn't happened" fields, so
+          they collapse into one compact grey line naming the next one. */}
+      {(() => {
+        const stages = [
+          { label: 'Prep requested at', at: order.prepRequestedAt, extra: order.prepRequestedBy ? ` · ${order.prepRequestedBy}` : (order.prepRequestedAt ? ' · by customer' : ''), pendingLabel: 'Not yet in preparation' },
+          { label: 'Ready at', at: order.readyAt, extra: order.readyBy ? ` · ${order.readyBy}` : '', pendingLabel: 'Not yet ready' },
+          { label: 'Collected at', at: order.collectedAt, extra: order.collectedBy ? ` · ${order.collectedBy}` : '', pendingLabel: 'Not yet collected' },
+        ];
+        const lastCompletedIdx = stages.reduce((acc, s, i) => (s.at ? i : acc), -1);
+        return (
+          <>
+            {stages.map((s, i) => (i <= lastCompletedIdx && s.at ? (
+              <div className="field" key={s.label}>
+                <label>{s.label}</label>
+                <div className="admin-item-name">{new Date(s.at).toLocaleString()}{s.extra}</div>
+              </div>
+            ) : null))}
+            {lastCompletedIdx < stages.length - 1 && (
+              <div className="field-status-pending">{stages[lastCompletedIdx + 1].pendingLabel}</div>
+            )}
+          </>
+        );
+      })()}
 
       <PaymentField order={order} />
 
@@ -344,21 +368,37 @@ export default function OrderDetailSheet({ order, onClose }) {
         )
       )}
       {order.status === 'Ready' && <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>}
-      {canRefund && (
-        <button className="btn-secondary" style={{ marginTop: 8, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>
-          {refunding ? 'Refunding…' : order.stripeSessionId ? 'Refund via Stripe' : isRedeemed ? 'Cancel & refund stamps' : 'Mark refunded (cash)'}
-        </button>
-      )}
-      {canRefund && order.stripeSessionId && (
-        <div style={{ textAlign: 'center', marginTop: 8 }}>
-          <span className="edit-link" onClick={partialRefund}>Partial refund…</span>
+      {/* Refund/delete are destructive and sit right below the workflow
+          buttons above (mark ready/collected) — a divider + extra gap
+          keeps a misclick between them from being an easy mistake. Both
+          actions still require a window.confirm() before anything happens. */}
+      <div className="order-danger-zone">
+        {canRefund && (
+          <button className="btn-secondary" style={{ marginTop: 0, color: '#b5563f', borderColor: '#FFDCD2' }} disabled={refunding} onClick={refund}>
+            {refunding ? 'Refunding…' : order.stripeSessionId ? 'Refund via Stripe' : isRedeemed ? 'Cancel & refund stamps' : 'Mark refunded (cash)'}
+          </button>
+        )}
+        {canRefund && order.stripeSessionId && (
+          <div style={{ textAlign: 'center', marginTop: 8 }}>
+            <span className="edit-link" onClick={partialRefund}>Partial refund…</span>
+          </div>
+        )}
+        {/* A small, muted text link — not a full-width button like refund,
+            and deliberately smaller than "Partial refund…" above it, since
+            delete is rare, irreversible, and shouldn't share visual weight
+            with the much more common refund action. Requires a press-and-hold
+            (not just a tap) before the confirm dialog even appears. */}
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <span
+            className={`remove-link remove-link-hold${holdingDelete ? ' holding' : ''}`}
+            onPointerDown={startDeleteHold}
+            onPointerUp={cancelDeleteHold}
+            onPointerLeave={cancelDeleteHold}
+            onPointerCancel={cancelDeleteHold}
+          >
+            {holdingDelete ? 'Keep holding to delete…' : 'Hold to delete order'}
+          </span>
         </div>
-      )}
-      {/* A small text link, not a full-width button like refund — delete is
-          rare and destructive, and shouldn't share visual weight with the
-          much more common refund action right above it. */}
-      <div style={{ textAlign: 'center', marginTop: 16 }}>
-        <span className="remove-link" onClick={remove}>Delete order</span>
       </div>
     </>
   );
