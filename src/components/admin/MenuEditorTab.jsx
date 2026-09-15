@@ -58,6 +58,22 @@ function TrashIcon() {
   );
 }
 
+function ArrowUpIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ArrowDownIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // Surfaces preorder/walk-in stock right in the list — previously only
 // visible after opening the item editor — so staff can spot a
 // running-low or sold-out item without a click per item.
@@ -84,7 +100,7 @@ function StockLine({ item }) {
 }
 
 export default function MenuEditorTab() {
-  const { menu, menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, showToast } = useMoocha();
+  const { menu, menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuMoveItem, showToast } = useMoocha();
   const [editing, setEditing] = useState(null); // { cat, item }
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
@@ -109,6 +125,7 @@ export default function MenuEditorTab() {
     menuDeleteItem(cat, id);
     showToast('Item deleted ✓');
   };
+  const moveItem = (cat, id, direction) => menuMoveItem(cat, id, direction);
 
   const categoryEntries = Object.keys(menu.categories).map((cat, idx) => ({
     cat, idx,
@@ -149,7 +166,7 @@ export default function MenuEditorTab() {
                   actually about to reach for it. */}
               {!q && <button className="icon-btn danger category-delete" title="Delete category" onClick={() => deleteCategory(cat)}><TrashIcon /></button>}
             </div>
-            {items.map((item) => (
+            {items.map((item, i) => (
               <div className="admin-item-row" key={item.id}>
                 <div className="admin-item-top">
                   <div>
@@ -158,10 +175,18 @@ export default function MenuEditorTab() {
                     <StockLine item={item} />
                   </div>
                   <div className="admin-item-actions">
-                    <button className="icon-btn" title="Edit item" onClick={() => setEditing({ cat, item })}>✎</button>
-                    <button className="icon-btn" title={item.soldout ? 'Mark available' : 'Mark sold out'} onClick={() => toggleSoldout(cat, item.id)}>{item.soldout ? '↺' : '⊘'}</button>
-                    <button className="icon-btn" title={item.isHidden ? 'Show on menu' : 'Hide from menu'} onClick={() => toggleHidden(cat, item.id)}>{item.isHidden ? 'S' : 'H'}</button>
-                    <button className="icon-btn danger" title="Delete item" onClick={() => deleteItem(cat, item.id)}>✕</button>
+                    {/* Reordering moves the item within its full category,
+                        so it only makes sense against the true, unfiltered
+                        position — hidden while a search narrows `items` to
+                        a subset (same reasoning as the category-delete
+                        button above). */}
+                    {!q && (
+                      <>
+                        <button className="icon-btn" title="Move up" disabled={i === 0} onClick={() => moveItem(cat, item.id, 'up')}><ArrowUpIcon /></button>
+                        <button className="icon-btn" title="Move down" disabled={i === items.length - 1} onClick={() => moveItem(cat, item.id, 'down')}><ArrowDownIcon /></button>
+                        <div className="icon-btn-divider" />
+                      </>
+                    )}
                     <button className="icon-btn" title="Edit item" onClick={() => setEditing({ cat, item })}><PencilIcon /></button>
                     <button className="icon-btn" title={item.soldout ? 'Mark available' : 'Mark sold out'} onClick={() => toggleSoldout(cat, item.id)}>{item.soldout ? <RestoreIcon /> : <SoldOutIcon />}</button>
                     <button className="icon-btn" title={item.isHidden ? 'Show on menu' : 'Hide from menu'} onClick={() => toggleHidden(cat, item.id)}><EyeIcon open={item.isHidden} /></button>

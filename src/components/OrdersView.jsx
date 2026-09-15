@@ -103,19 +103,19 @@ export default function OrdersView() {
       {ordersLoading ? (
         <div className="empty-state" style={{ padding: '20px 10px' }}>Loading your orders…</div>
       ) : myOrders.length ? myOrders.map(o => (
-        <div className="order-row" key={o.id}>
-          <div className="order-row-left">
-            <div className="oid">#{o.id}</div>
-            <div className="oitems">{o.items.map(i => `${i.name}${i.sugar ? ` (${i.sugar})` : ''} x${i.qty}`).join(', ')}</div>
+        <div className="my-order-row" key={o.id}>
+          <div className="my-order-row-left">
+            <div className="my-oid">#{o.id}</div>
+            <div className="my-oitems">{o.items.map(i => `${i.name}${i.sugar ? ` (${i.sugar})` : ''} x${i.qty}`).join(', ')}</div>
             <span className={`order-status ${o.status === 'Refunded' ? 'status-refunded' : o.status === 'Payment failed' ? 'status-failed' : o.status === 'Preparing' ? 'status-preparing' : ''}`}>{o.status}</span>
           </div>
-          <div className="order-row-right">
-            <div className="oprice">{money(o.total)}</div>
+          <div className="my-order-row-right">
+            <div className="my-oprice">{money(o.total)}</div>
             {o.status === 'Received' && o.orderType !== 'walkin' && (
               !telegramStatus?.linked ? (
-                <div className="order-row-note">Connect Telegram above to start preparing your order</div>
+                <div className="my-order-row-note">Connect Telegram above to start preparing your order</div>
               ) : !collectionOpen ? (
-                <div className="order-row-note">
+                <div className="my-order-row-note">
                   {collectionWindow ? `You can ask staff to start on your order during collection hours: ${collectionWindow}.` : "You can ask staff to start on your order once collection hours open"}
                 </div>
               ) : (
@@ -130,7 +130,7 @@ export default function OrdersView() {
               )
             )}
             {o.status === 'Preparing' && o.aheadDrinks != null && (
-              <div className="order-row-note">
+              <div className="my-order-row-note">
                 {o.aheadDrinks === 0 ? "You're next!" : `${o.aheadDrinks} drink${o.aheadDrinks === 1 ? '' : 's'} ahead of you`}
               </div>
             )}
