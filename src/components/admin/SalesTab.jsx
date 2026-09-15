@@ -18,7 +18,6 @@ function OrdersIcon() {
 // null = not enough data for a meaningful comparison (both days empty).
 // isNew = today has activity but yesterday had none — a % change would be
 // infinite/undefined, so that gets its own "new today" badge instead.
-const MEDALS = ['🥇', '🥈', '🥉'];
 
 function trendFor(today, yesterday) {
   if (today === 0 && yesterday === 0) return null;
@@ -28,7 +27,7 @@ function trendFor(today, yesterday) {
 
 function TrendBadge({ trend }) {
   if (!trend) return null;
-  if (trend.isNew) return <span className="trend-badge trend-up">🌱 new today</span>;
+  if (trend.isNew) return <span className="trend-badge trend-up">new today</span>;
   const up = trend.pct >= 0;
   return <span className={`trend-badge ${up ? 'trend-up' : 'trend-down'}`}>{up ? '▲' : '▼'} {Math.abs(trend.pct)}% vs yesterday</span>;
 }
@@ -154,7 +153,7 @@ export default function SalesTab() {
           ? topItems.map(([name, qty], i) => (
             <div className="top-item-row" key={name}>
               <span className="top-item-left">
-                <span className={`rank-badge ${i < 3 ? 'medal' : ''}`}>{i < 3 ? MEDALS[i] : i + 1}</span>
+                <span className={`rank-badge ${i < 3 ? 'medal' : ''}`}>{i + 1}</span>
                 {name}
               </span>
               <span>{qty} sold</span>

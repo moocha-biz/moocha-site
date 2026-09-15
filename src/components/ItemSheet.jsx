@@ -45,11 +45,11 @@ export default function ItemSheet({ item, editLine, onClose }) {
     if (editLine) {
       updateLine(editLine.lineId, line);
       onClose();
-      showToast(`Updated ${item.name} 🍵`);
+      showToast(`Updated ${item.name}`);
     } else {
       addLineToCart({ lineId: Date.now() + Math.random(), ...line });
       onClose();
-      showToast(`Added ${item.name} 🍵`);
+      showToast(`Added ${item.name}`);
     }
   };
 
@@ -63,7 +63,7 @@ export default function ItemSheet({ item, editLine, onClose }) {
         <div className="item-name-tags"><ItemTags tags={item.customTags} /></div>
       </div>
       <div className="sheet-sub">{item.desc}</div>
-      {remaining != null && remaining > 0 && remaining < 5 && <div className="low-stock-tag" style={{ marginTop: -8, marginBottom: 10 }}>🔥 only {remaining} left this week - grab yours!</div>}
+      {remaining != null && remaining > 0 && remaining < 5 && <div className="low-stock-tag" style={{ marginTop: -8, marginBottom: 10 }}>only {remaining} left this week - grab yours!</div>}
       {sugarLevels.length > 0 && (
         <div className="opt-group">
           <div className="opt-label">Sweetness <span className="opt-required">pick one</span></div>

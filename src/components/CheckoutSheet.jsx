@@ -55,12 +55,12 @@ export default function CheckoutSheet({ onClose }) {
   };
 
   const startPayNowCheckout = async () => {
-    if (!name.trim() || !phone.trim()) { showToast('Fill in your name and phone number 🙏'); return; }
+    if (!name.trim() || !phone.trim()) { showToast('Fill in your name and phone number'); return; }
     // Stripe's hosted Checkout page always requires an email address in
     // payment mode — there's no option to make it optional there — so it
     // must be required here too, or customers who skip it get stuck
     // re-entering it as "required" on a page they didn't expect to ask.
-    if (!isFreeOrder && !email.trim()) { showToast('Add your email for the receipt 🙏'); return; }
+    if (!isFreeOrder && !email.trim()) { showToast('Add your email for the receipt'); return; }
     // Catches a typo before it becomes an order that's unrecoverable from
     // My Rewards — an unnormalized/malformed phone here would silently
     // fragment this customer's stamp card into two different records
@@ -121,22 +121,22 @@ export default function CheckoutSheet({ onClose }) {
     return (
       <>
         <div className="sheet-close" />
-        <div className="sheet-title" style={{ textAlign: 'center' }}>Free drink redeemed! 🎉</div>
+        <div className="sheet-title" style={{ textAlign: 'center' }}>Free drink redeemed!</div>
         <div className="order-confirm-id">Order #{redeemedOrder.id}</div>
         <div className="sheet-sub" style={{ textAlign: 'center' }}>No payment needed - quote order #{redeemedOrder.id} or your name/phone at pickup.</div>
         {collectionWindow && (
           <div className="closed-banner" style={{ padding: '12px 14px', marginBottom: 14, background: 'var(--mint)' }}>
-            <div className="heading" style={{ fontSize: 14, color: 'var(--green-dark)' }}>🕐 ready for pickup:</div>
+            <div className="heading" style={{ fontSize: 14, color: 'var(--green-dark)' }}>ready for pickup:</div>
             <div className="sub" style={{ color: 'var(--green-dark)' }}>{collectionWindow}</div>
           </div>
         )}
         {(redeemedOrder.items || []).map((it, i) => (
-          <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}{it.redeemed ? ` · 🎁 ${it.freeQty || 1} free` : ''}</span><span>{money(it.lineTotal)}</span></div>
+          <div className="summary-row" key={i}><span>{it.name}{it.sugar ? ` (${it.sugar})` : ''} x{it.qty}{it.redeemed ? ` · ${it.freeQty || 1} free` : ''}</span><span>{money(it.lineTotal)}</span></div>
         ))}
         <div className="summary-row total"><span>Total</span><span>{money(0)}</span></div>
         <TelegramLinkPrompt phone={myProfile?.phone} token={myProfile?.customerToken} />
-        <div className="sheet-sub" style={{ textAlign: 'center', marginTop: 10 }}>See you soon! 👋</div>
-        <button className="btn-primary" style={{ marginTop: 6 }} onClick={() => { onClose(); setTab('loyalty'); }}><span>Done</span></button>
+        <div className="sheet-sub" style={{ textAlign: 'center', marginTop: 10 }}>See you soon!</div>
+        <button className="btn-primary" style={{ marginTop: 6 }} onClick={() => { onClose(); setTab('orders'); }}><span>Done</span></button>
       </>
     );
   }
@@ -144,12 +144,12 @@ export default function CheckoutSheet({ onClose }) {
   return (
     <>
       <div className="sheet-close" />
-      <div className="sheet-title">Checkout 🧋</div>
+      <div className="sheet-title">Checkout</div>
       <div className="sheet-sub">We'll use this for your order and your stamp card.</div>
       {!sb && <div className="demo-banner" style={{ marginBottom: 14 }}>Connect Supabase and Stripe first (see README.md) for PayNow payment to work.</div>}
       {totalFreeUnits > 0 && (
         <div className="section-note" style={{ color: 'var(--green-dark)', fontWeight: 800, marginBottom: 4 }}>
-          🎁 {totalFreeUnits} free drink{totalFreeUnits > 1 ? 's' : ''} applied from your stamp card
+          {totalFreeUnits} free drink{totalFreeUnits > 1 ? 's' : ''} applied from your stamp card
         </div>
       )}
       <div className="field"><label htmlFor="checkout-name">Name</label><input id="checkout-name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>

@@ -30,8 +30,9 @@ export default function App() {
       // Switched synchronously (not gated on refreshMyLoyalty resolving) so
       // the page behind the confirmation overlay is never the just-cleared,
       // now-empty cart — that reads as "your order failed" right next to a
-      // modal saying it succeeded.
-      setTab('loyalty');
+      // modal saying it succeeded. Orders (not Rewards) since that's where
+      // this just-placed order itself now shows up.
+      setTab('orders');
       refreshMyLoyalty();
       fireConfetti();
       setPaymentResult({ type: 'success', orderId: params.get('order_id'), sessionId: params.get('session_id') });
@@ -68,10 +69,11 @@ export default function App() {
         <Route path="/" element={<CustomerApp confirmationActive={!!paymentResult} />} />
         <Route path="/menu" element={<CustomerApp confirmationActive={!!paymentResult} />} />
         <Route path="/cart" element={<CustomerApp confirmationActive={!!paymentResult} />} />
+        <Route path="/orders" element={<CustomerApp confirmationActive={!!paymentResult} />} />
         <Route path="/rewards" element={<CustomerApp confirmationActive={!!paymentResult} />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <Overlay show={!!paymentResult} onClose={() => setPaymentResult(null)} center cardModal>
+      <Overlay show={!!paymentResult} onClose={() => setPaymentResult(null)} center cardModal floatClose>
         <PaymentResultModal
           result={paymentResult}
           onClose={() => setPaymentResult(null)}

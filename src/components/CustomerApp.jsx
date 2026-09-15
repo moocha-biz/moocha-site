@@ -6,6 +6,7 @@ import CategoryNav from './CategoryNav.jsx';
 import MenuView from './MenuView.jsx';
 import CartView from './CartView.jsx';
 import LoyaltyView from './LoyaltyView.jsx';
+import OrdersView from './OrdersView.jsx';
 import TabBar from './TabBar.jsx';
 import Overlay from './Overlay.jsx';
 import ItemSheet from './ItemSheet.jsx';
@@ -14,6 +15,7 @@ import CheckoutSheet from './CheckoutSheet.jsx';
 const TAB_META = {
   menu: { title: 'moocha menu', description: 'yummy matcha drinks made fresh to order at moocha' },
   cart: { title: 'your cart', description: 'review your order before checkout at moocha.' },
+  orders: { title: 'your orders', description: 'track your moocha order status and pickup notifications.' },
   loyalty: { title: 'moocha rewards!', description: "track your moocha stamp card and loyalty rewards!" },
 };
 
@@ -52,14 +54,15 @@ export default function CustomerApp({ confirmationActive = false }) {
 
         {lastSupabaseError && (
           <div className="closed-banner" style={{ margin: '0 20px 10px 20px', padding: '12px 16px' }}>
-            <div className="heading" style={{ fontSize: 14 }}>having trouble loading 🌧️</div>
+            <div className="heading" style={{ fontSize: 14 }}>having trouble loading</div>
             <div className="sub" style={{ fontSize: 12.5 }}>Try refreshing the page - if it keeps happening, let us know at the counter.</div>
             <span className="remove-link" style={{ display: 'inline-block', marginTop: 6 }} onClick={() => setLastSupabaseError(null)}>Dismiss</span>
           </div>
         )}
 
         <nav className="desktop-nav">
-          <button className={tab !== 'loyalty' ? 'active' : ''} onClick={() => setTab('menu')}>Menu</button>
+          <button className={(tab === 'menu' || tab === 'cart') ? 'active' : ''} onClick={() => setTab('menu')}>Menu</button>
+          <button className={tab === 'orders' ? 'active' : ''} onClick={() => setTab('orders')}>Orders</button>
           <button className={tab === 'loyalty' ? 'active' : ''} onClick={() => setTab('loyalty')}>Rewards</button>
         </nav>
 
@@ -68,6 +71,7 @@ export default function CustomerApp({ confirmationActive = false }) {
         <main id="mainView">
           {tab === 'menu' && <MenuView onOpenItem={setOpenItemId} />}
           {tab === 'cart' && <div className="mobile-only-cart"><CartView onCheckout={() => setCheckoutOpen(true)} onEditLine={startEditLine} /></div>}
+          {tab === 'orders' && <OrdersView />}
           {tab === 'loyalty' && <LoyaltyView />}
         </main>
 
@@ -83,7 +87,7 @@ export default function CustomerApp({ confirmationActive = false }) {
               a contradiction ("did my order go through or not?"). Swap in a
               neutral message for that narrow window instead. */}
           {cart.length === 0 && (checkoutOpen || confirmationActive) ? (
-            <div className="empty-state" style={{ padding: '20px 10px' }}>🎉 Order confirmed - see the confirmation for details.</div>
+            <div className="empty-state" style={{ padding: '20px 10px' }}>Order confirmed - see the confirmation for details.</div>
           ) : (
             <CartView onCheckout={() => setCheckoutOpen(true)} onEditLine={startEditLine} />
           )}

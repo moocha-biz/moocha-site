@@ -85,7 +85,7 @@ export default function MenuEditorTab() {
                   <div className="admin-item-actions">
                     <button className="icon-btn" title="Edit item" onClick={() => setEditing({ cat, item })}>✎</button>
                     <button className="icon-btn" title={item.soldout ? 'Mark available' : 'Mark sold out'} onClick={() => toggleSoldout(cat, item.id)}>{item.soldout ? '↺' : '⊘'}</button>
-                    <button className="icon-btn" title={item.isHidden ? 'Show on menu' : 'Hide from menu'} onClick={() => toggleHidden(cat, item.id)}>{item.isHidden ? '👁' : '🙈'}</button>
+                    <button className="icon-btn" title={item.isHidden ? 'Show on menu' : 'Hide from menu'} onClick={() => toggleHidden(cat, item.id)}>{item.isHidden ? 'S' : 'H'}</button>
                     <button className="icon-btn danger" title="Delete item" onClick={() => deleteItem(cat, item.id)}>✕</button>
                   </div>
                 </div>
