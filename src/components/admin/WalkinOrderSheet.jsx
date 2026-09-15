@@ -21,6 +21,7 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
   const [query, setQuery] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [busyQr, setBusyQr] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const allItems = Object.values(menu.categories).flat().filter(i => !i.isHidden);
   const itemById = Object.fromEntries(allItems.map(i => [i.id, i]));
@@ -202,30 +203,6 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
         </div>
       ))}
 
-      {lineEntries.length > 0 && (
-        <>
-          <div className="section-label" style={{ marginTop: 16 }}>Order so far</div>
-          {lineEntries.map(([key, l]) => {
-            const free = freeQtyByKey[key] || 0;
-            return (
-              <div className="cart-line" key={key}>
-                <div className="cart-line-top"><span>{l.name} · {l.sugar}</span><span>{money(l.price * (l.qty - free))}</span></div>
-                <div className="cart-line-bottom">
-                  <div className="mini-qty">
-                    <button className="mini-btn" onClick={() => removeUnit(key)}>−</button>
-                    <span>{l.qty}</span>
-                    <button className="mini-btn" onClick={() => addUnit(itemById[l.itemId], l.sugar)}>+</button>
-                  </div>
-                  {canRedeem && (free > 0 || freeRemaining > 0) && (
-                    <span className="edit-link" onClick={() => cycleFree(key, l.qty)}>{free > 0 ? `${free} free ✓` : 'make free'}</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </>
-      )}
-
       <div className="field" style={{ marginTop: 16 }}><label htmlFor="walkin-notes">Notes (optional)</label><textarea id="walkin-notes" rows={2} value={notes} onChange={e => setNotes(e.target.value)} /></div>
 
       {/* Sticky rather than sitting after the item list — with a full menu
@@ -238,6 +215,45 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
         position: 'sticky', bottom: -30, marginLeft: -20, marginRight: -20, marginBottom: -30,
         background: 'var(--cream2)', padding: '14px 20px 30px 20px', boxShadow: '0 -6px 14px -10px rgba(0,0,0,0.25)',
       }}>
+        {/* Collapsed by default to a one-line count so staff can glance at
+            "what's in the order" while still scrolling the menu, without
+            the full line list eating into the sticky footer's space (and
+            pushing the Log order button off-screen) on a big order. */}
+        {lineEntries.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div
+              onClick={() => setCartOpen(o => !o)}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+            >
+              <span style={{ fontFamily: 'Baloo 2', fontWeight: 700, fontSize: 14, color: 'var(--green-dark)' }}>
+                Order so far · {cartQtyTotal} item{cartQtyTotal === 1 ? '' : 's'}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)' }}>{cartOpen ? 'Hide ▲' : 'Show ▼'}</span>
+            </div>
+            {cartOpen && (
+              <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 8 }}>
+                {lineEntries.map(([key, l]) => {
+                  const free = freeQtyByKey[key] || 0;
+                  return (
+                    <div className="cart-line" key={key}>
+                      <div className="cart-line-top"><span>{l.name} · {l.sugar}</span><span>{money(l.price * (l.qty - free))}</span></div>
+                      <div className="cart-line-bottom">
+                        <div className="mini-qty">
+                          <button className="mini-btn" onClick={() => removeUnit(key)}>−</button>
+                          <span>{l.qty}</span>
+                          <button className="mini-btn" onClick={() => addUnit(itemById[l.itemId], l.sugar)}>+</button>
+                        </div>
+                        {canRedeem && (free > 0 || freeRemaining > 0) && (
+                          <span className="edit-link" onClick={() => cycleFree(key, l.qty)}>{free > 0 ? `${free} free ✓` : 'make free'}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
         <div className="summary-row total" style={{ marginBottom: 12 }}><span>Total</span><span>{money(total)}</span></div>
         {qrDataUrl ? (
           <div style={{ textAlign: 'center', marginBottom: 12 }}>
