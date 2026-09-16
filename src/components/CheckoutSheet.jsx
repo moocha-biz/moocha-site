@@ -22,8 +22,10 @@ export default function CheckoutSheet({ onClose }) {
   // Generated once per sheet open (not per click) so a double-tap of "Pay
   // with PayNow" (or "Place order" for a fully-redeemed cart) reuses the
   // same orderId — that's what lets the edge function's idempotency
-  // key/conflict handling actually catch the double-submit.
-  const [orderId] = useState(() => 'M' + Date.now().toString().slice(-6));
+  // key/conflict handling actually catch the double-submit. Uses a random
+  // UUID (not a short/guessable id) so two unrelated customers can never
+  // collide on the same orders.id primary key.
+  const [orderId] = useState(() => 'M' + crypto.randomUUID());
 
   const isFreeOrder = totalFreeUnits > 0 && cartTotalAfterRedeem === 0;
   // Price/name are re-derived server-side from the items table — only
@@ -92,9 +94,10 @@ export default function CheckoutSheet({ onClose }) {
           orderId, name: profile.name, phone: profile.phone, email: profile.email, notes: notes.trim(), items,
           customerToken: myProfile?.customerToken,
           // {CHECKOUT_SESSION_ID} is a literal Stripe placeholder — Stripe
-          // substitutes it with the real (high-entropy, unguessable)
-          // session id on redirect. That's what get_order_receipt looks
-          // orders up by now, instead of the guessable, 6-digit orderId.
+          // substitutes it with the real session id on redirect. That's
+          // what get_order_receipt looks orders up by, instead of orderId
+          // — orderId sits in plain sight in this URL, so it can't double
+          // as a secret lookup key the way the session id can.
           successUrl: `${base}?stripe_success=1&order_id=${orderId}&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${base}?stripe_canceled=1`,
         },
