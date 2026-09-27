@@ -13,14 +13,38 @@ const TABS = [
   { id: 'settings', label: 'Settings' },
 ];
 
+// Plain stroke icon, not an emoji — consistent with the icon-component
+// pattern MenuEditorTab.jsx already uses (PencilIcon/TrashIcon/etc).
+function SpeakerIcon({ muted }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      {muted
+        ? <path d="M16 9l5 6M21 9l-5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        : <path d="M16.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}
+    </svg>
+  );
+}
+
 export default function AdminApp() {
-  const { sb, adminTab, setAdminTab, refreshAdminData, logOut, lastSupabaseError, setLastSupabaseError } = useMoocha();
+  const {
+    sb, adminTab, setAdminTab, refreshAdminData, logOut, lastSupabaseError, setLastSupabaseError,
+    soundMuted, setSoundMuted,
+  } = useMoocha();
 
   return (
     <div className="app" id="adminApp" style={{ display: 'flex' }}>
       <div className="admin-header">
         <div className="heading">moocha staff</div>
         <div className="admin-header-btns">
+          <button
+            className="icon-btn"
+            style={{ marginRight: 6 }}
+            title={soundMuted ? 'Unmute prep-request alert' : 'Mute prep-request alert'}
+            onClick={() => setSoundMuted(!soundMuted)}
+          >
+            <SpeakerIcon muted={soundMuted} />
+          </button>
           <button className="admin-back" onClick={() => refreshAdminData().then(() => setAdminTab(adminTab))}>↻ Refresh</button>
           <button className="admin-logout" onClick={logOut}>Log out</button>
         </div>

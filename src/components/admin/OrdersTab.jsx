@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMoocha } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
 import { exportToExcel } from '../../lib/exportXlsx.js';
+import { toLocalDateStr } from '../../lib/date.js';
 import Overlay from '../Overlay.jsx';
 import WalkinOrderSheet from './WalkinOrderSheet.jsx';
 import OrderDetailSheet from './OrderDetailSheet.jsx';
@@ -13,13 +14,6 @@ const TYPE_FILTERS = [{ key: 'all', label: 'All types' }, { key: 'preorder', lab
 // in progress. Type only has two real options besides "all", where picking
 // both is equivalent to "all", so it stays single-select.
 const STATUS_FILTERS = [{ key: 'Received', label: 'Received' }, { key: 'Preparing', label: 'Preparing' }, { key: 'Ready', label: 'Ready' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }, { key: 'Payment failed', label: 'Payment failed' }];
-
-// <input type="date"> gives/wants "YYYY-MM-DD" in local time.
-function toLocalDateStr(iso) {
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
 
 export default function OrdersTab() {
   const { orders } = useMoocha();
@@ -43,7 +37,15 @@ export default function OrdersTab() {
   const q = query.trim().toLowerCase();
   let filtered = orders.filter(o => {
     if (typeFilter !== 'all' && (o.orderType || 'preorder') !== typeFilter) return false;
-    if (statusFilter.size > 0 && !statusFilter.has(o.status)) return false;
+    if (statusFilter.size > 0) {
+      if (!statusFilter.has(o.status)) return false;
+    } else if (o.status === 'Payment failed') {
+      // Abandoned/expired checkouts, not something staff need to act on —
+      // hidden from the default "all statuses" view so they don't clutter
+      // the list, but still reachable by explicitly selecting the
+      // "Payment failed" chip.
+      return false;
+    }
     if (dateFilter && toLocalDateStr(o.date) !== dateFilter) return false;
     if (!q) return true;
     const haystack = [o.id, o.name, o.phone, ...(o.items || []).map(i => i.name)].join(' ').toLowerCase();

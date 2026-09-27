@@ -325,7 +325,7 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 #adminApp{ width:100%; max-width:520px; min-height:100vh; background:var(--cream); flex-direction:column; margin:0 auto; }
 .admin-header{ background:var(--green-dark); color:#fff; padding:20px; display:flex; justify-content:space-between; align-items:center; gap:10px;}
 .admin-header .heading{ font-size:20px; font-weight:800;}
-.admin-header-btns{ display:flex; gap:8px; }
+.admin-header-btns{ display:flex; align-items:center; gap:8px; }
 .admin-back{ background:rgba(255,255,255,0.15); border:none; color:#fff; padding:8px 14px; border-radius:999px; font-weight:700; font-size:12px; cursor:pointer; font-family:'Baloo 2';}
 .admin-logout{ background:none; border:1.5px solid rgba(255,255,255,0.35); color:rgba(255,255,255,0.75); padding:7px 13px; border-radius:999px; font-weight:700; font-size:12px; cursor:pointer; font-family:'Baloo 2';}
 .admin-logout:hover{ background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.6); color:#fff;}
