@@ -8,7 +8,11 @@ import OrderDetailSheet from './OrderDetailSheet.jsx';
 import StatusBadge from './StatusBadge.jsx';
 
 const TYPE_FILTERS = [{ key: 'all', label: 'All types' }, { key: 'preorder', label: 'Preorder' }, { key: 'walkin', label: 'Walk-in' }];
-const STATUS_FILTERS = [{ key: 'all', label: 'All statuses' }, { key: 'Received', label: 'Received' }, { key: 'Preparing', label: 'Preparing' }, { key: 'Ready', label: 'Ready' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }, { key: 'Payment failed', label: 'Payment failed' }];
+// Status, unlike type, is worth multi-selecting — running a café you'd
+// often want "Preparing + Ready" at once, e.g. to see everything currently
+// in progress. Type only has two real options besides "all", where picking
+// both is equivalent to "all", so it stays single-select.
+const STATUS_FILTERS = [{ key: 'Received', label: 'Received' }, { key: 'Preparing', label: 'Preparing' }, { key: 'Ready', label: 'Ready' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }, { key: 'Payment failed', label: 'Payment failed' }];
 
 // <input type="date"> gives/wants "YYYY-MM-DD" in local time.
 function toLocalDateStr(iso) {
@@ -23,13 +27,23 @@ export default function OrdersTab() {
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  // A Set of selected statuses rather than a single string — empty means
+  // "all statuses" (no filter), matching "All statuses" being the default
+  // selected chip.
+  const [statusFilter, setStatusFilter] = useState(() => new Set());
+  const toggleStatusFilter = (key) => {
+    setStatusFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
   const [dateFilter, setDateFilter] = useState('');
 
   const q = query.trim().toLowerCase();
   let filtered = orders.filter(o => {
     if (typeFilter !== 'all' && (o.orderType || 'preorder') !== typeFilter) return false;
-    if (statusFilter !== 'all' && o.status !== statusFilter) return false;
+    if (statusFilter.size > 0 && !statusFilter.has(o.status)) return false;
     if (dateFilter && toLocalDateStr(o.date) !== dateFilter) return false;
     if (!q) return true;
     const haystack = [o.id, o.name, o.phone, ...(o.items || []).map(i => i.name)].join(' ').toLowerCase();
@@ -37,8 +51,10 @@ export default function OrdersTab() {
   });
   // Viewing the Preparing queue specifically reads as a worklist, not a
   // log — oldest request first (next to hand off) instead of the usual
-  // newest-order-first ordering everywhere else.
-  if (statusFilter === 'Preparing') {
+  // newest-order-first ordering everywhere else. Only when Preparing is the
+  // sole selected status, since mixing it with other statuses (e.g.
+  // Preparing + Ready) isn't a single queue anymore.
+  if (statusFilter.size === 1 && statusFilter.has('Preparing')) {
     filtered = [...filtered].sort((a, b) => new Date(a.prepRequestedAt) - new Date(b.prepRequestedAt));
   }
 
@@ -117,16 +133,23 @@ export default function OrdersTab() {
 
       {(pendingWalkins > 0 || pendingPreorders > 0 || preparingNow > 0 || readyForPickup > 0) && (
         <div className="stat-grid" style={{ marginBottom: 14 }}>
+          {/* Border colors match the status these counts represent — same
+              tokens as .order-row.pending/.preparing-now/.ready-pickup below
+              and StatusBadge's Received/Preparing/Ready colors, so staff can
+              pattern-match a card to the rows/badges it summarizes. Walk-in
+              and preorder here are both "Received", so they intentionally
+              share a color too, same as the row list already does — the
+              type is conveyed by the label text, not a separate color. */}
           <div className="stat-card" style={{ borderLeft: '4px solid var(--sun-deep)' }}>
             <div className="stat-num">{pendingWalkins}</div>
             <div className="stat-label">walk-in{pendingWalkins === 1 ? '' : 's'} waiting</div>
           </div>
-          <div className="stat-card" style={{ borderLeft: '4px solid var(--green)' }}>
+          <div className="stat-card" style={{ borderLeft: '4px solid var(--sun-deep)' }}>
             <div className="stat-num">{pendingPreorders}</div>
             <div className="stat-label">preorder{pendingPreorders === 1 ? '' : 's'} to collect</div>
           </div>
           {preparingNow > 0 && (
-            <div className="stat-card" style={{ borderLeft: '4px solid var(--card-yellow)' }}>
+            <div className="stat-card" style={{ borderLeft: '4px solid var(--mint-deep)' }}>
               <div className="stat-num">{preparingNow}</div>
               <div className="stat-label">asked to start prep</div>
             </div>
@@ -149,8 +172,9 @@ export default function OrdersTab() {
         ))}
       </div>
       <div className="opt-row" style={{ marginBottom: 14 }}>
+        <button className={`opt-chip ${statusFilter.size === 0 ? 'selected' : ''}`} onClick={() => setStatusFilter(new Set())}>All statuses</button>
         {STATUS_FILTERS.map(f => (
-          <button key={f.key} className={`opt-chip ${statusFilter === f.key ? 'selected' : ''}`} onClick={() => setStatusFilter(f.key)}>{f.label}</button>
+          <button key={f.key} className={`opt-chip ${statusFilter.has(f.key) ? 'selected' : ''}`} onClick={() => toggleStatusFilter(f.key)}>{f.label}</button>
         ))}
       </div>
 
