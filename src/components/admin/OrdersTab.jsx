@@ -13,7 +13,7 @@ const TYPE_FILTERS = [{ key: 'all', label: 'All types' }, { key: 'preorder', lab
 // often want "Preparing + Ready" at once, e.g. to see everything currently
 // in progress. Type only has two real options besides "all", where picking
 // both is equivalent to "all", so it stays single-select.
-const STATUS_FILTERS = [{ key: 'Received', label: 'Received' }, { key: 'Preparing', label: 'Preparing' }, { key: 'Ready', label: 'Ready' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }, { key: 'Payment failed', label: 'Payment failed' }];
+const STATUS_FILTERS = [{ key: 'Received', label: 'Received' }, { key: 'Preparing', label: 'Preparing' }, { key: 'Ready', label: 'Ready' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }];
 
 export default function OrdersTab() {
   const { orders } = useMoocha();
@@ -36,16 +36,12 @@ export default function OrdersTab() {
 
   const q = query.trim().toLowerCase();
   let filtered = orders.filter(o => {
+    // Abandoned/expired checkouts — never surfaced in the admin Orders
+    // page, not even via an explicit status filter, since there's nothing
+    // for staff to act on.
+    if (o.status === 'Payment failed') return false;
     if (typeFilter !== 'all' && (o.orderType || 'preorder') !== typeFilter) return false;
-    if (statusFilter.size > 0) {
-      if (!statusFilter.has(o.status)) return false;
-    } else if (o.status === 'Payment failed') {
-      // Abandoned/expired checkouts, not something staff need to act on —
-      // hidden from the default "all statuses" view so they don't clutter
-      // the list, but still reachable by explicitly selecting the
-      // "Payment failed" chip.
-      return false;
-    }
+    if (statusFilter.size > 0 && !statusFilter.has(o.status)) return false;
     if (dateFilter && toLocalDateStr(o.date) !== dateFilter) return false;
     if (!q) return true;
     const haystack = [o.id, o.name, o.phone, ...(o.items || []).map(i => i.name)].join(' ').toLowerCase();
