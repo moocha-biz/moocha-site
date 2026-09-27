@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMoocha } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
 import { exportToExcel } from '../../lib/exportXlsx.js';
+import { toLocalDateStr } from '../../lib/date.js';
 import Overlay from '../Overlay.jsx';
 import WalkinOrderSheet from './WalkinOrderSheet.jsx';
 import OrderDetailSheet from './OrderDetailSheet.jsx';
@@ -12,14 +13,7 @@ const TYPE_FILTERS = [{ key: 'all', label: 'All types' }, { key: 'preorder', lab
 // often want "Preparing + Ready" at once, e.g. to see everything currently
 // in progress. Type only has two real options besides "all", where picking
 // both is equivalent to "all", so it stays single-select.
-const STATUS_FILTERS = [{ key: 'Received', label: 'Received' }, { key: 'Preparing', label: 'Preparing' }, { key: 'Ready', label: 'Ready' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }, { key: 'Payment failed', label: 'Payment failed' }];
-
-// <input type="date"> gives/wants "YYYY-MM-DD" in local time.
-function toLocalDateStr(iso) {
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+const STATUS_FILTERS = [{ key: 'Received', label: 'Received' }, { key: 'Preparing', label: 'Preparing' }, { key: 'Ready', label: 'Ready' }, { key: 'Collected', label: 'Collected' }, { key: 'Refunded', label: 'Refunded' }];
 
 export default function OrdersTab() {
   const { orders } = useMoocha();
@@ -42,6 +36,10 @@ export default function OrdersTab() {
 
   const q = query.trim().toLowerCase();
   let filtered = orders.filter(o => {
+    // Abandoned/expired checkouts — never surfaced in the admin Orders
+    // page, not even via an explicit status filter, since there's nothing
+    // for staff to act on.
+    if (o.status === 'Payment failed') return false;
     if (typeFilter !== 'all' && (o.orderType || 'preorder') !== typeFilter) return false;
     if (statusFilter.size > 0 && !statusFilter.has(o.status)) return false;
     if (dateFilter && toLocalDateStr(o.date) !== dateFilter) return false;

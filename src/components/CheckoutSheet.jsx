@@ -22,10 +22,15 @@ export default function CheckoutSheet({ onClose }) {
   // Generated once per sheet open (not per click) so a double-tap of "Pay
   // with PayNow" (or "Place order" for a fully-redeemed cart) reuses the
   // same orderId — that's what lets the edge function's idempotency
-  // key/conflict handling actually catch the double-submit. Uses a random
-  // UUID (not a short/guessable id) so two unrelated customers can never
-  // collide on the same orders.id primary key.
-  const [orderId] = useState(() => 'M' + crypto.randomUUID());
+  // key/conflict handling actually catch the double-submit. 8 hex chars
+  // (32 bits) sliced off a real crypto.randomUUID() — enough entropy that
+  // two unrelated customers colliding on the same orders.id is a
+  // non-concern at any order volume this café will ever see (~50% odds of
+  // a single collision only after tens of thousands of orders), while
+  // staying short enough for a customer to actually read/quote at pickup
+  // — the previous fix for this same collision problem swung too far the
+  // other way and used the full 36-character UUID.
+  const [orderId] = useState(() => 'M' + crypto.randomUUID().replace(/-/g, '').slice(0, 8));
 
   const isFreeOrder = totalFreeUnits > 0 && cartTotalAfterRedeem === 0;
   // Price/name are re-derived server-side from the items table — only

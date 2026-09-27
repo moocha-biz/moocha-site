@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { sb } from './lib/supabaseClient.js';
 import { getLocal, setLocal } from './lib/storage.js';
 import { edgeFunctionErrorMessage } from './lib/edgeFunctionError.js';
+import { playChime } from './lib/chime.js';
 import {
   DEFAULT_MENU, DEFAULT_SETTINGS, DEFAULT_SUGAR_LEVELS, STAMP_GOAL,
   DEMO_PASSPHRASE_KEY, DEMO_DEFAULT_PASSPHRASE,
@@ -64,6 +65,14 @@ export function MoochaProvider({ children }) {
   const isAdmin = !!session;
   const staffEmail = session?.user?.email || null;
   const [adminTab, setAdminTab] = useState('sales');
+  // Whether the prep-request chime (see the admin-orders-changes
+  // subscription below) plays — persisted so a staff member's preference
+  // survives a reload instead of defaulting back to on every session.
+  const [soundMuted, setSoundMutedState] = useState(() => getLocal('moocha_admin_sound_muted', false));
+  const setSoundMuted = useCallback((next) => {
+    setSoundMutedState(next);
+    setLocal('moocha_admin_sound_muted', next);
+  }, []);
 
   useEffect(() => {
     if (!sb) return;
@@ -768,19 +777,31 @@ export function MoochaProvider({ children }) {
   // status update, a refund — instead of only ever updating on a manual
   // "Refresh" click. Only orders are refetched (not the full
   // refreshAdminData sweep) since nothing else changes from an order
-  // event. Needs `orders` added to the supabase_realtime publication (see
-  // 20260915120000_realtime_orders.sql) — RLS on orders already governs
-  // which rows this subscription can see, same as any other read.
+  // event. Needs `orders` added to the supabase_realtime publication AND
+  // replica identity full (see 20260915150000_realtime_orders_v2.sql) —
+  // the latter is what makes payload.old.status actually present below,
+  // not just the primary key. RLS on orders already governs which rows
+  // this subscription can see, same as any other read.
+  //
+  // Also plays a chime specifically when an order transitions INTO
+  // 'Preparing' — covers both a customer's /prepare on Telegram and
+  // staff's own "Mark preparing" button — so a staff member not looking at
+  // the screen still notices, instead of relying on them spotting the
+  // silent list refresh. Scoped to that one transition, not every event,
+  // so refunds/new orders/etc. stay silent.
   useEffect(() => {
     if (!isAdmin || !sb) return;
     const channel = sb
       .channel('admin-orders-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
         setOrders(await fetchOrders());
+        if (!soundMuted && payload.eventType === 'UPDATE' && payload.new?.status === 'Preparing' && payload.old?.status !== 'Preparing') {
+          playChime();
+        }
       })
       .subscribe();
     return () => { sb.removeChannel(channel); };
-  }, [isAdmin, fetchOrders]);
+  }, [isAdmin, fetchOrders, soundMuted]);
 
   const logOut = useCallback(async () => {
     if (sb) await sb.auth.signOut();
@@ -821,6 +842,7 @@ export function MoochaProvider({ children }) {
     lastSupabaseError, setLastSupabaseError,
     // admin
     isAdmin, staffEmail, adminTab, setAdminTab, logOut, refreshAdminData, signInStaff, changeStaffPassword,
+    soundMuted, setSoundMuted,
     // toast
     toast, showToast,
     // backend actions
