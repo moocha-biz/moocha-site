@@ -11,9 +11,11 @@
 // customer's own (anonymous) browser session for the 'preparing' stage,
 // and customers never hold a real Supabase Auth session to authenticate
 // with. Safe without it because the function never trusts anything the
-// caller sends beyond which orderId/stage to check — worst case a caller
-// who knows/guesses an orderId triggers a duplicate, accurate status DM to
-// that order's own linked customer, not a data leak or a fake message.
+// caller sends beyond which orderId/stage to check, and each stage's DM is
+// claimed once via orders.preparing_notified_at/ready_notified_at — repeat
+// calls for the same order and stage are skipped, so it can't be used to
+// spam a customer. Unknown order ids get the same 200 "skipped" as every
+// other no-op, so responses don't reveal which order ids exist.
 //
 // The order's status change is already committed regardless of whether the
 // DM succeeds, so this only ever returns 200 — "skipped" for the expected,
@@ -58,10 +60,7 @@ Deno.serve(async (req) => {
       .eq("id", orderId)
       .maybeSingle();
     if (orderError || !order) {
-      return new Response(JSON.stringify({ error: "Order not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return skip("not found");
     }
     if (order.status !== wantStatus) {
       return skip(`not ${wantStatus}`);
@@ -77,6 +76,20 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!customer?.telegram_chat_id) {
       return skip("not linked");
+    }
+
+    // Claim this stage's DM before sending. The status filter keeps the
+    // claim in step with the check above if the order moved on meanwhile.
+    const notifiedColumn = wantStatus === "Preparing" ? "preparing_notified_at" : "ready_notified_at";
+    const { data: claimed } = await supabase
+      .from("orders")
+      .update({ [notifiedColumn]: new Date().toISOString() })
+      .eq("id", order.id)
+      .eq("status", wantStatus)
+      .is(notifiedColumn, null)
+      .select("id");
+    if (!claimed || claimed.length === 0) {
+      return skip("already notified");
     }
 
     let text: string;
@@ -96,6 +109,8 @@ Deno.serve(async (req) => {
       await sendTelegramMessage(customer.telegram_chat_id, text);
     } catch (sendErr) {
       console.error("sendTelegramMessage failed:", sendErr);
+      // Release the claim so a later call can still deliver it.
+      await supabase.from("orders").update({ [notifiedColumn]: null }).eq("id", order.id);
       return skip("send failed");
     }
 
