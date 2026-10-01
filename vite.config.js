@@ -7,6 +7,12 @@ export default defineConfig({
   // break the build on any path deeper than /.
   base: '/',
   plugins: [react()],
+  build: {
+    // The only chunk over Vite's 500 kB default is xlsx, which
+    // exportXlsx.js already dynamic-imports on an Export click — it never
+    // loads with the page, so the warning is noise.
+    chunkSizeWarningLimit: 600,
+  },
   server: {
     watch: {
       // Desktop is iCloud-synced; iCloud's background sync repeatedly
