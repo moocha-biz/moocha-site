@@ -34,11 +34,23 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+// The item list is split across items_0, items_1, … by
+// create-checkout-session (Stripe caps each metadata value at 500 chars).
+// Sessions created before that change carry a single `items` key instead.
 // deno-lint-ignore no-explicit-any
-function parseItems(raw: string | undefined): any[] {
+function readMetaItems(meta: Record<string, string>): any[] {
+  let raw = "";
+  if (meta.items_0 !== undefined) {
+    for (let i = 0; meta[`items_${i}`] !== undefined; i++) raw += meta[`items_${i}`];
+  } else {
+    raw = meta.items || "[]";
+  }
   try {
-    return JSON.parse(raw || "[]");
-  } catch (_e) {
+    return JSON.parse(raw);
+  } catch (e) {
+    // Shouldn't happen any more — but if it does, the order is still booked
+    // (the customer paid) with no items, so make it loud in the logs.
+    console.error("Couldn't parse order items from session metadata:", meta.order_id, e);
     return [];
   }
 }
@@ -62,7 +74,7 @@ Deno.serve(async (req) => {
   // deno-lint-ignore no-explicit-any
   async function bookPaidOrder(session: any) {
     const meta = session.metadata || {};
-    const items = parseItems(meta.items);
+    const items = readMetaItems(meta);
 
     const { error } = await supabase.from("orders").insert({
       id: meta.order_id || session.id,
@@ -140,7 +152,7 @@ Deno.serve(async (req) => {
       name: meta.name || "",
       phone: meta.phone || "",
       date: new Date().toISOString(),
-      items: parseItems(meta.items),
+      items: readMetaItems(meta),
       total: (session.amount_total || 0) / 100,
       notes: meta.notes || "",
       status,

@@ -24,6 +24,20 @@ const supabase = createClient(
 // Keep in sync with STAMP_GOAL in src/data/defaults.js.
 const STAMP_GOAL = 8;
 
+// Stripe caps metadata at 50 keys of 500 chars each. The item list is
+// usually well over 500 chars (~90 per line), so it's split across
+// items_0, items_1, … and re-joined by stripe-webhook's readMetaItems().
+// 4 keys go to order_id/name/phone/notes, leaving 46 for items.
+const META_CHUNK = 500;
+const MAX_ITEM_CHUNKS = 46;
+function itemsMetadata(json: string): Record<string, string> | null {
+  const out: Record<string, string> = {};
+  const count = Math.ceil(json.length / META_CHUNK);
+  if (count > MAX_ITEM_CHUNKS) return null;
+  for (let i = 0; i < count; i++) out[`items_${i}`] = json.slice(i * META_CHUNK, (i + 1) * META_CHUNK);
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -197,6 +211,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Built from metaItems (server-verified name/price), not the raw client
+    // payload, so the order record can't be forged either. Checked before
+    // anything is created in Stripe.
+    // Non-ASCII escaped as \uXXXX (still valid JSON) so a chunk boundary
+    // can never split an emoji's surrogate pair in a menu item name.
+    const itemsJson = JSON.stringify(metaItems)
+      .replace(/[\u007f-\uffff]/g, (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+    const itemsMeta = itemsMetadata(itemsJson);
+    if (!itemsMeta) {
+      return new Response(JSON.stringify({ error: "Your cart is too large for one order — please split it up" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const trimmedEmail = String(email || "").trim();
     // Stripe's hosted Checkout page always requires an email in payment
     // mode — there's no way to disable that field — so it's enforced here
@@ -225,14 +254,10 @@ Deno.serve(async (req) => {
         line_items: lineItems,
         metadata: {
           order_id: String(orderId),
-          name: String(name || ""),
-          phone: String(phone || ""),
+          name: String(name || "").slice(0, 500),
+          phone: String(phone || "").slice(0, 500),
           notes: String(notes || "").slice(0, 400),
-          // Stripe metadata values are capped at 500 chars each — fine for a
-          // typical small cart, but a very large order could get truncated.
-          // Built from metaItems (server-verified name/price), not the raw
-          // client payload, so the order record can't be forged either.
-          items: JSON.stringify(metaItems).slice(0, 480),
+          ...itemsMeta,
         },
         customer: customer.id,
         payment_intent_data: { receipt_email: trimmedEmail },

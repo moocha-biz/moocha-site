@@ -18,8 +18,9 @@ function presetBounds(key, customStart, customEnd) {
   const todayStr = toLocalDateStr(new Date().toISOString());
   if (key === 'today') return { start: todayStr, end: todayStr };
   if (key === 'week') {
+    // Calendar week starting Monday (getDay() is 0 for Sunday).
     const d = new Date();
-    d.setDate(d.getDate() - 6);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
     return { start: toLocalDateStr(d.toISOString()), end: todayStr };
   }
   if (key === 'month') {
@@ -107,11 +108,15 @@ export default function SalesTab() {
   // whatever range happens to be selected — and only shown at all for the
   // all-time/today presets, where "vs yesterday" is still a sensible thing
   // to ask (see showTrend below).
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const yesterdayKey = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  // Local calendar days, not UTC — in SGT (UTC+8) a UTC slice would count
+  // anything ordered between midnight and 8am as the previous day.
+  const todayKey = toLocalDateStr(new Date().toISOString());
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = toLocalDateStr(yesterday.toISOString());
   let todayRevenue = 0, yesterdayRevenue = 0, todayOrders = 0, yesterdayOrders = 0;
   paidOrders.forEach(o => {
-    const day = o.date.slice(0, 10);
+    const day = toLocalDateStr(o.date);
     if (day === todayKey) { todayRevenue += o.total; todayOrders += 1; }
     else if (day === yesterdayKey) { yesterdayRevenue += o.total; yesterdayOrders += 1; }
   });
@@ -122,7 +127,7 @@ export default function SalesTab() {
   useEffect(() => {
     if (!canvasRef.current) return;
     const byDay = {};
-    rangedOrders.forEach(o => { const day = o.date.slice(0, 10); byDay[day] = (byDay[day] || 0) + o.total; });
+    rangedOrders.forEach(o => { const day = toLocalDateStr(o.date); byDay[day] = (byDay[day] || 0) + o.total; });
     let days;
     if (range) {
       // A specific range is selected — show exactly those days, not the
@@ -144,7 +149,7 @@ export default function SalesTab() {
       // a 3-day floor) instead of always drawing 7 columns where only the
       // last one or two ever have a bar in them.
       const earliestDay = rangedOrders.length
-        ? rangedOrders.reduce((min, o) => { const d = o.date.slice(0, 10); return d < min ? d : min; }, rangedOrders[0].date.slice(0, 10))
+        ? rangedOrders.reduce((min, o) => { const d = toLocalDateStr(o.date); return d < min ? d : min; }, toLocalDateStr(rangedOrders[0].date))
         : null;
       const daysOfHistory = earliestDay
         ? Math.floor((Date.now() - new Date(earliestDay + 'T00:00:00').getTime()) / 86400000) + 1
@@ -153,7 +158,7 @@ export default function SalesTab() {
       days = Array.from({ length: rangeDays }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - (rangeDays - 1 - i));
-        return d.toISOString().slice(0, 10);
+        return toLocalDateStr(d.toISOString());
       });
     }
     const data = days.map(d => byDay[d] || 0);
