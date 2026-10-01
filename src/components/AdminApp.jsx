@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { useMoocha } from '../store.jsx';
+import { enableChimeUnlock } from '../lib/chime.js';
 import SalesTab from './admin/SalesTab.jsx';
 import OrdersTab from './admin/OrdersTab.jsx';
 import CustomersTab from './admin/CustomersTab.jsx';
@@ -31,6 +33,9 @@ export default function AdminApp() {
     sb, adminTab, setAdminTab, refreshAdminData, logOut, lastSupabaseError, setLastSupabaseError,
     soundMuted, setSoundMuted,
   } = useMoocha();
+
+  // Unlocks the prep-request chime's audio on the first tap — see chime.js.
+  useEffect(() => enableChimeUnlock(), []);
 
   return (
     <div className="app" id="adminApp" style={{ display: 'flex' }}>

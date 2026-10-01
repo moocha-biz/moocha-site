@@ -777,31 +777,45 @@ export function MoochaProvider({ children }) {
   // status update, a refund — instead of only ever updating on a manual
   // "Refresh" click. Only orders are refetched (not the full
   // refreshAdminData sweep) since nothing else changes from an order
-  // event. Needs `orders` added to the supabase_realtime publication AND
-  // replica identity full (see 20260915150000_realtime_orders_v2.sql) —
-  // the latter is what makes payload.old.status actually present below,
-  // not just the primary key. RLS on orders already governs which rows
-  // this subscription can see, same as any other read.
+  // event. Needs `orders` in the supabase_realtime publication (see
+  // 20260927090000_realtime_orders_v2.sql). RLS on orders already governs
+  // which rows this subscription can see, same as any other read.
   //
   // Also plays a chime specifically when an order transitions INTO
-  // 'Preparing' — covers both a customer's /prepare on Telegram and
-  // staff's own "Mark preparing" button — so a staff member not looking at
-  // the screen still notices, instead of relying on them spotting the
-  // silent list refresh. Scoped to that one transition, not every event,
-  // so refunds/new orders/etc. stay silent.
+  // 'Preparing' (e.g. a customer's /prepare on Telegram) so a staff member
+  // not looking at the screen still notices. The previous status comes
+  // from our own last-known copy of the list, NOT payload.old: with RLS
+  // enabled, Realtime only puts the primary key in `old` (even with
+  // replica identity full), so old.status was always undefined and every
+  // unrelated update to an already-Preparing order re-chimed.
+  const orderStatusRef = useRef(new Map());
+  useEffect(() => {
+    orderStatusRef.current = new Map(orders.map(o => [o.id, o.status]));
+  }, [orders]);
+  // Read via a ref so toggling mute doesn't tear down and resubscribe the
+  // Realtime channel.
+  const soundMutedRef = useRef(soundMuted);
+  useEffect(() => { soundMutedRef.current = soundMuted; }, [soundMuted]);
+
   useEffect(() => {
     if (!isAdmin || !sb) return;
     const channel = sb
       .channel('admin-orders-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
-        setOrders(await fetchOrders());
-        if (!soundMuted && payload.eventType === 'UPDATE' && payload.new?.status === 'Preparing' && payload.old?.status !== 'Preparing') {
-          playChime();
+        if (payload.eventType === 'UPDATE' && payload.new?.id) {
+          const prevStatus = orderStatusRef.current.get(payload.new.id);
+          // Recorded immediately (before the refetch lands) so a second
+          // event for the same order in quick succession can't chime twice.
+          orderStatusRef.current.set(payload.new.id, payload.new.status);
+          if (!soundMutedRef.current && payload.new.status === 'Preparing' && prevStatus !== 'Preparing') {
+            playChime();
+          }
         }
+        setOrders(await fetchOrders());
       })
       .subscribe();
     return () => { sb.removeChannel(channel); };
-  }, [isAdmin, fetchOrders, soundMuted]);
+  }, [isAdmin, fetchOrders]);
 
   const logOut = useCallback(async () => {
     if (sb) await sb.auth.signOut();
