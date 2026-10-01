@@ -176,6 +176,13 @@ export default function OrdersTab() {
         ))}
       </div>
 
+      {/* How many orders the current search/filters match — e.g. pick
+          today's date to see today's order count. */}
+      {filtered.length > 0 && (
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', marginBottom: 8 }}>
+          {filtered.length} order{filtered.length === 1 ? '' : 's'}
+        </div>
+      )}
       {orders.length === 0 && <div className="empty-state">No orders yet.</div>}
       {orders.length > 0 && filtered.length === 0 && <div className="empty-state">No orders match your search/filters.</div>}
       {filtered.map(o => (

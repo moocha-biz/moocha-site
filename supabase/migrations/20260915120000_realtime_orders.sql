@@ -7,4 +7,16 @@
 -- RLS already governs which rows a subscribed client receives events for,
 -- same as any other read — the existing "staff all orders" policy (any
 -- authenticated session) covers the admin dashboard's own subscription.
-alter publication supabase_realtime add table orders;
+--
+-- Guarded so it's safe to re-run: this was applied by hand on the live
+-- project before being recorded in schema_migrations, and a plain
+-- `alter publication ... add table` errors if the table's already a member.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'orders'
+  ) then
+    alter publication supabase_realtime add table orders;
+  end if;
+end $$;
