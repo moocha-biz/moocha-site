@@ -92,11 +92,17 @@ Deno.serve(async (req) => {
     if (error) {
       // Stripe explicitly can redeliver the same event more than once.
       // orders.id is the primary key, so a redelivery lands here as a
-      // conflict (already inserted) rather than a duplicate row — and
-      // critically, we must NOT re-run the stock booking below for it,
+      // unique violation (already inserted) rather than a duplicate row —
+      // and critically, we must NOT re-run the stock booking below for it,
       // or the same paid order would get double-counted against stock.
-      console.error("Order insert skipped (likely a duplicate webhook delivery):", error);
-      return;
+      if (error.code === "23505") {
+        console.warn("Order already booked (duplicate webhook delivery):", meta.order_id);
+        return;
+      }
+      // Anything else means the customer paid and no order exists. Throw so
+      // the handler answers 500 and Stripe retries the event, instead of
+      // acknowledging it and losing the order.
+      throw new Error(`Couldn't book paid order ${meta.order_id}: ${error.message}`);
     }
 
     // Books this order's items against each item's preorder stock
@@ -161,34 +167,42 @@ Deno.serve(async (req) => {
     if (error) console.error(`Failed to record ${status} checkout session:`, error);
   }
 
-  if (event.type === "checkout.session.completed") {
-    // deno-lint-ignore no-explicit-any
-    const session = event.data.object as any;
-    // PayNow is an async payment method: this event fires the instant the
-    // customer finishes the checkout form, before the QR is actually paid.
-    // payment_status is only "paid" here for payment methods that clear
-    // immediately (e.g. cards). For PayNow, wait for
-    // checkout.session.async_payment_succeeded instead.
-    if (session.payment_status === "paid") {
+  try {
+    if (event.type === "checkout.session.completed") {
+      // deno-lint-ignore no-explicit-any
+      const session = event.data.object as any;
+      // PayNow is an async payment method: this event fires the instant the
+      // customer finishes the checkout form, before the QR is actually paid.
+      // payment_status is only "paid" here for payment methods that clear
+      // immediately (e.g. cards). For PayNow, wait for
+      // checkout.session.async_payment_succeeded instead.
+      if (session.payment_status === "paid") {
+        await bookPaidOrder(session);
+      }
+    } else if (event.type === "checkout.session.async_payment_succeeded") {
+      // deno-lint-ignore no-explicit-any
+      const session = event.data.object as any;
       await bookPaidOrder(session);
+    } else if (event.type === "checkout.session.async_payment_failed") {
+      // The PayNow payment was declined/failed (distinct from timing out).
+      // deno-lint-ignore no-explicit-any
+      const session = event.data.object as any;
+      await recordFailedOrder(session, "Payment failed");
+    } else if (event.type === "checkout.session.expired") {
+      // The PayNow QR timed out (or the customer closed the tab) before
+      // paying. Nothing was ever written for this order, so record it as a
+      // failed attempt — the admin dashboard can then show it instead of it
+      // vanishing silently, and staff can follow up if needed.
+      // deno-lint-ignore no-explicit-any
+      const session = event.data.object as any;
+      await recordFailedOrder(session, "Payment failed");
     }
-  } else if (event.type === "checkout.session.async_payment_succeeded") {
-    // deno-lint-ignore no-explicit-any
-    const session = event.data.object as any;
-    await bookPaidOrder(session);
-  } else if (event.type === "checkout.session.async_payment_failed") {
-    // The PayNow payment was declined/failed (distinct from timing out).
-    // deno-lint-ignore no-explicit-any
-    const session = event.data.object as any;
-    await recordFailedOrder(session, "Payment failed");
-  } else if (event.type === "checkout.session.expired") {
-    // The PayNow QR timed out (or the customer closed the tab) before
-    // paying. Nothing was ever written for this order, so record it as a
-    // failed attempt — the admin dashboard can then show it instead of it
-    // vanishing silently, and staff can follow up if needed.
-    // deno-lint-ignore no-explicit-any
-    const session = event.data.object as any;
-    await recordFailedOrder(session, "Payment failed");
+  } catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   return new Response(JSON.stringify({ received: true }), {

@@ -20,7 +20,7 @@ export default function LoyaltyView() {
         </>
       )}
       <div className="section-label">Your stamp card</div>
-      <div className="section-note">1 stamp per drink · {STAMP_GOAL} stamps = a free drink · tap the card to flip it</div>
+      <div className="section-note">1 stamp per drink · buy {STAMP_GOAL - 1}, the {STAMP_GOAL}th is free · tap the card to flip it</div>
       <StampCard stamps={totalStamps} flipEnabled rewardMessage="free drink unlocked - mention it at pickup!" />
     </>
   );

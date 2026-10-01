@@ -65,16 +65,17 @@ Deno.serve(async (req) => {
     // This is just a friendly early check to skip the stock lookup below
     // for an obviously-ineligible request; place_redeemed_order() re-checks
     // (and actually deducts) under a row lock, so it's what really decides
-    // eligibility. Unlike create-checkout-session, nothing here is being
-    // freshly paid for, so only pre-existing, already-verified stamps count
-    // — a $0 order can't fund its own reward the way a mixed cart can.
+    // eligibility. Same "buy 7, the 8th's on us" rule as the cart and
+    // create-checkout-session — the free drink itself is the 8th on the
+    // card — so every unit being free means floor((stamps + qty) / 8) has
+    // to cover all of them, i.e. 7 banked stamps per free unit.
     const { data: rewardRow } = await supabase
       .from("customers")
       .select("stamps")
       .eq("phone", trimmedPhone)
       .eq("access_token", customerToken)
       .maybeSingle();
-    if (!rewardRow || Math.floor((rewardRow.stamps || 0) / STAMP_GOAL) < totalFreeQty) {
+    if (!rewardRow || Math.floor(((rewardRow.stamps || 0) + totalFreeQty) / STAMP_GOAL) < totalFreeQty) {
       return new Response(JSON.stringify({ error: "You don't have enough stamps for a free drink yet" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -139,7 +140,7 @@ Deno.serve(async (req) => {
 
     // Order insert, stamp deduction, and stock booking all happen inside
     // one atomic, row-locked function — not three separate client calls —
-    // so the 8 stamps actually come off the moment the order is placed
+    // so the 7 stamps per free drink actually come off the moment the order is placed
     // (not only once staff mark it collected), and a concurrent redemption
     // attempt for the same phone can't both pass the eligibility check
     // before either one deducts. orders.id being the primary key still
