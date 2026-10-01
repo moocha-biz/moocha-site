@@ -275,8 +275,6 @@ main{ flex:1; padding:6px 20px 110px 20px; position:relative; z-index:2;}
 .stamp-slot{ position:relative; display:flex; align-items:center; justify-content:center;}
 .stamp-slot-star{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain;}
 .stamp-slot-cow{ position:relative; z-index:1; width:55%; height:55%; object-fit:contain; animation: pop .3s ease;}
-.stamp-slot-free{ position:relative; z-index:1; font-family:'Baloo 2'; font-weight:800; font-size:clamp(9px,2vw,12px); letter-spacing:.04em; color:#6b4c05; opacity:.55;}
-.stamp-slot-free.ready{ opacity:1; background:var(--sun); padding:2px 7px; border-radius:10px; animation: pop .3s ease;}
 @keyframes pop{ 0%{transform:scale(0.4);} 70%{transform:scale(1.15);} 100%{transform:scale(1);} }
 .stamp-card-face-inner .reward-banner{ position:absolute; left:10%; bottom:2.5%; width:80%; z-index:1;}
 .reward-banner{ margin-top:14px; background:var(--sun); color:#6b4c05; font-weight:800; font-family:'Baloo 2'; font-size:clamp(11px,2.2vw,13px); padding:9px 14px; border-radius:14px; text-align:center; position:relative; z-index:1;}

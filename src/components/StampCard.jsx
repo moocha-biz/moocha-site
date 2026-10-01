@@ -13,12 +13,9 @@ export default function StampCard({ stamps, flipEnabled = true, rewardMessage })
   const [showFront, setShowFront] = useState(true);
   const [flipping, setFlipping] = useState(false);
   const totalStamps = stamps || 0;
-  // "Buy 7, the 8th's on us": stamps count paid drinks, so the card stays
-  // an 8-slot card but only the first 7 ever take a stamp — the 8th slot is
-  // the free drink itself, marked FREE (and lit up once 7 unlocks it).
-  const paidSlots = STAMP_GOAL - 1;
-  const progress = Math.min(totalStamps, paidSlots);
-  const readyForReward = totalStamps >= paidSlots;
+  const progress = Math.min(totalStamps, STAMP_GOAL);
+  // Buy 7, the 8th's on us — 7 stamps unlocks the free drink.
+  const readyForReward = totalStamps >= STAMP_GOAL - 1;
 
   const back = (
     <div className="stamp-card-face-inner">
@@ -31,7 +28,6 @@ export default function StampCard({ stamps, flipEnabled = true, rewardMessage })
           <div key={i} className="stamp-slot">
             <img className="stamp-slot-star" src="/assets/stamp-card/15.svg" alt="" />
             {i < progress && <img className="stamp-slot-cow" src="/assets/stamp-card/12.svg" alt="stamp" />}
-            {i === paidSlots && <span className={`stamp-slot-free ${readyForReward ? 'ready' : ''}`}>FREE</span>}
           </div>
         ))}
       </div>
