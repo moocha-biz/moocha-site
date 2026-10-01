@@ -13,11 +13,12 @@ export default function StampCard({ stamps, flipEnabled = true, rewardMessage })
   const [showFront, setShowFront] = useState(true);
   const [flipping, setFlipping] = useState(false);
   const totalStamps = stamps || 0;
-  // "Buy 7, the 8th's on us": stamps count paid drinks, and the last slot
-  // is the free drink itself — so 7 stamps fills the card and unlocks it.
-  const paidSlots = STAMP_GOAL - 1;
-  const progress = Math.min(totalStamps, paidSlots);
-  const readyForReward = totalStamps >= paidSlots;
+  // "Buy 7, the 8th's on us": stamps count paid drinks, so 7 unlocks the
+  // reward. The card itself stays an 8-stamp card — once the reward is
+  // unlocked the 8th slot (the free drink) is stamped too, so a ready card
+  // shows full.
+  const readyForReward = totalStamps >= STAMP_GOAL - 1;
+  const progress = readyForReward ? STAMP_GOAL : totalStamps;
 
   const back = (
     <div className="stamp-card-face-inner">
