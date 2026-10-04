@@ -83,6 +83,21 @@ Deno.serve(async (req) => {
         .eq("access_token", customerToken)
         .maybeSingle();
       verifiedStamps = rewardRow?.stamps || 0;
+      // Stamps only come off when an order is collected, so any already
+      // promised to another uncollected order's free drink are still in
+      // that balance — without this, the same 7 stamps bought a free drink
+      // on every order placed before the first one was picked up.
+      if (verifiedStamps > 0) {
+        const { data: onHold, error: holdError } = await supabase.rpc("stamps_on_hold", { p_phone: trimmedPhone });
+        if (holdError) {
+          console.error("Stamp hold check failed:", holdError);
+          return new Response(JSON.stringify({ error: "Couldn't verify cart, please try again" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        verifiedStamps = Math.max(verifiedStamps - (onHold || 0), 0);
+      }
     }
 
     const itemIds = cartLines.map((i) => i.itemId).filter(Boolean);
