@@ -105,10 +105,7 @@ Deno.serve(async (req) => {
       text = `Your order #${order.id} is ready for pickup!${itemsSummary ? `\n${itemsSummary}` : ""}`;
     }
 
-    try {
-      await sendTelegramMessage(customer.telegram_chat_id, text);
-    } catch (sendErr) {
-      console.error("sendTelegramMessage failed:", sendErr);
+    if (!(await sendTelegramMessage(customer.telegram_chat_id, text))) {
       // Release the claim so a later call can still deliver it.
       await supabase.from("orders").update({ [notifiedColumn]: null }).eq("id", order.id);
       return skip("send failed");
