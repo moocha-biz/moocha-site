@@ -6,6 +6,9 @@ import StampCard from '../StampCard.jsx';
 import StatusBadge from './StatusBadge.jsx';
 
 const RECENT_ORDERS_SHOWN = 8;
+// Buy 7, the 8th's on us — a full card is 7 stamps, the 8th slot is the
+// free drink itself.
+const MAX_STAMPS = STAMP_GOAL - 1;
 const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME;
 
 export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
@@ -53,11 +56,11 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
   const mine = orders.filter(o => o.phone === customer.phone);
   const stats = { count: mine.length, spend: mine.reduce((s, o) => s + o.total, 0) };
 
-  const nudgeStamps = (delta) => setStampInput(prev => Math.min(STAMP_GOAL, Math.max(0, (parseInt(prev, 10) || 0) + delta)));
+  const nudgeStamps = (delta) => setStampInput(prev => Math.min(MAX_STAMPS, Math.max(0, (parseInt(prev, 10) || 0) + delta)));
 
   const save = async () => {
     const val = parseInt(stampInput, 10);
-    if (isNaN(val) || val < 0 || val > STAMP_GOAL) { showToast(`Enter a stamp count between 0 and ${STAMP_GOAL}`); return; }
+    if (isNaN(val) || val < 0 || val > MAX_STAMPS) { showToast(`Enter a stamp count between 0 and ${MAX_STAMPS}`); return; }
     await setCustomerStamps(customer.phone, val);
     setCustomers(await fetchCustomers());
     onClose();
@@ -137,19 +140,19 @@ export default function CustomerDetailSheet({ customer, onClose, onChanged }) {
       )}
 
       <div className="field">
-        <label htmlFor="customer-stamp-count">Set exact stamp count (goal: {STAMP_GOAL})</label>
+        <label htmlFor="customer-stamp-count">Set exact stamp count (free drink at {MAX_STAMPS})</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button type="button" className="mini-btn" disabled={(parseInt(stampInput, 10) || 0) <= 0} onClick={() => nudgeStamps(-1)}>−</button>
           <input
             id="customer-stamp-count"
-            type="number" min={0} max={STAMP_GOAL} style={{ flex: 1, textAlign: 'center' }} value={stampInput}
+            type="number" min={0} max={MAX_STAMPS} style={{ flex: 1, textAlign: 'center' }} value={stampInput}
             onChange={e => {
               const raw = e.target.value;
               if (raw === '') { setStampInput(''); return; }
-              setStampInput(Math.min(STAMP_GOAL, Math.max(0, parseInt(raw, 10) || 0)));
+              setStampInput(Math.min(MAX_STAMPS, Math.max(0, parseInt(raw, 10) || 0)));
             }}
           />
-          <button type="button" className="mini-btn" disabled={(parseInt(stampInput, 10) || 0) >= STAMP_GOAL} onClick={() => nudgeStamps(1)}>+</button>
+          <button type="button" className="mini-btn" disabled={(parseInt(stampInput, 10) || 0) >= MAX_STAMPS} onClick={() => nudgeStamps(1)}>+</button>
         </div>
       </div>
       <button className="btn-primary" onClick={save}><span>Save stamps</span><span>→</span></button>

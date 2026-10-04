@@ -13,8 +13,11 @@ export default function StampCard({ stamps, flipEnabled = true, rewardMessage })
   const [showFront, setShowFront] = useState(true);
   const [flipping, setFlipping] = useState(false);
   const totalStamps = stamps || 0;
-  const progress = totalStamps > 0 && totalStamps % STAMP_GOAL === 0 ? STAMP_GOAL : totalStamps % STAMP_GOAL;
-  const readyForReward = totalStamps > 0 && totalStamps % STAMP_GOAL === 0;
+  // Buy 7, the 8th's on us: a stamp is only given once a paid drink is
+  // collected, so the card tops out at 7 and the 8th slot is always blank —
+  // the free drink is applied in the cart and the card resets after it.
+  const progress = Math.min(totalStamps, STAMP_GOAL - 1);
+  const readyForReward = totalStamps >= STAMP_GOAL - 1;
 
   const back = (
     <div className="stamp-card-face-inner">
