@@ -3,9 +3,10 @@ import QRCode from 'qrcode';
 import { useMoocha, DEFAULT_SUGAR_LEVELS, STAMP_GOAL } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
 import { buildPayNowPayload } from '../../lib/paynow.js';
+import { stampsOnHold } from '../../lib/stamps.js';
 
 export default function WalkinOrderSheet({ onClose, onLogged }) {
-  const { menu, customers, logWalkinOrder, showToast } = useMoocha();
+  const { menu, customers, orders, logWalkinOrder, showToast } = useMoocha();
   // Keyed by `${itemId}::${sugar}` so the same drink at different sugar
   // levels becomes separate lines, each independently adjustable.
   const [linesByKey, setLinesByKey] = useState({});
@@ -67,7 +68,9 @@ export default function WalkinOrderSheet({ onClose, onLogged }) {
   const cartQtyTotal = lineEntries.reduce((s, [, l]) => s + l.qty, 0);
 
   const matchedCustomer = customers.find(c => c.phone === phone.trim());
-  const customerStamps = matchedCustomer?.stamps || 0;
+  // Less any stamps another uncollected order's free drink already holds —
+  // log_walkin_order refuses to spend those twice.
+  const customerStamps = Math.max((matchedCustomer?.stamps || 0) - stampsOnHold(orders, phone.trim()), 0);
   // Mirrors the online cart's crossing logic (store.jsx's totalFreeUnits) —
   // stamps already banked plus every drink in this walk-in order itself can
   // cross STAMP_GOAL, possibly more than once on a big order.

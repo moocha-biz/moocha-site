@@ -47,6 +47,10 @@ export function MoochaProvider({ children }) {
   const [cart, setCart] = useState(() => getLocal('moocha_cart', []));
   const [myProfile, setMyProfile] = useState(() => getLocal('moocha_my_profile', null));
   const [myStamps, setMyStamps] = useState(0);
+  // Stamps already promised to a free drink in one of my uncollected
+  // orders (see stamps_on_hold) — still in myStamps until collection, but
+  // not spendable on another free drink.
+  const [myStampsOnHold, setMyStampsOnHold] = useState(0);
 
   // ---------------- shared/backend-derived state ----------------
   const [menu, setMenu] = useState(DEFAULT_MENU);
@@ -452,9 +456,15 @@ export function MoochaProvider({ children }) {
   // Customers never sign in, so their own stamp count and order history
   // can't come from the customers/orders tables directly anymore (those
   // are staff-only now) — these two narrow RPCs are the replacement.
+  const fetchMyStampsOnHold = useCallback(async (phone, token) => {
+    if (!sb || !phone || !token) { setMyStampsOnHold(0); return; }
+    const { data, error } = await sb.rpc('get_my_stamps_on_hold', { p_phone: phone, p_token: token });
+    setMyStampsOnHold(error ? 0 : (data || 0));
+  }, []);
+
   const refreshMyLoyalty = useCallback(async (profile) => {
     const p = profile !== undefined ? profile : myProfile;
-    if (!p) { setMyStamps(0); return; }
+    if (!p) { setMyStamps(0); setMyStampsOnHold(0); return; }
     if (!sb) {
       const list = getLocal('demo_customers', []);
       const mine = list.find(c => c.phone === p.phone);
@@ -465,10 +475,13 @@ export function MoochaProvider({ children }) {
     // right after a paid order (see get_order_receipt / stripe-webhook) —
     // without it, a phone number alone (an 8-digit, brute-forceable SG
     // mobile number) can't unlock someone else's stamp count.
-    const { data, error } = await sb.rpc('get_my_stamps', { p_phone: p.phone, p_token: p.customerToken || null });
+    const [{ data, error }] = await Promise.all([
+      sb.rpc('get_my_stamps', { p_phone: p.phone, p_token: p.customerToken || null }),
+      fetchMyStampsOnHold(p.phone, p.customerToken),
+    ]);
     if (error) { noteSupabaseError('Checking your stamp card', error); setMyStamps(0); return; }
     setMyStamps(data || 0);
-  }, [myProfile, noteSupabaseError]);
+  }, [myProfile, noteSupabaseError, fetchMyStampsOnHold]);
 
   const fetchMyOrders = useCallback(async (phone, token) => {
     if (!phone) return [];
@@ -570,8 +583,9 @@ export function MoochaProvider({ children }) {
     // The RPC already hands back the current stamp count — no need for a
     // second round-trip through get_my_stamps just to display it.
     setMyStamps(data.stamps || 0);
+    await fetchMyStampsOnHold(data.phone, data.customerToken);
     return { name: data.name, stamps: data.stamps };
-  }, [saveProfile, saveCustomerToken]);
+  }, [saveProfile, saveCustomerToken, fetchMyStampsOnHold]);
 
   // ---------------- cart helpers ----------------
   const saveCartLocal = useCallback((next) => setLocal('moocha_cart', next), []);
@@ -584,7 +598,11 @@ export function MoochaProvider({ children }) {
   // verified token, only this cart's own quantity can earn a free drink
   // (self-funded by what's being paid for right now, nothing to steal) —
   // any pre-existing banked stamps are ignored until ownership is proven.
-  const verifiedStamps = (myProfile?.phone && myProfile?.customerToken) ? (myStamps || 0) : 0;
+  // Less any stamps already held by another uncollected order's free drink,
+  // matching what create-checkout-session/redeem-order will allow.
+  const verifiedStamps = (myProfile?.phone && myProfile?.customerToken)
+    ? Math.max((myStamps || 0) - myStampsOnHold, 0)
+    : 0;
   const cartQtyTotal = cart.reduce((s, l) => s + l.qty, 0);
   // Every STAMP_GOAL-th drink — counting stamps already banked plus every
   // drink in this very cart — is free, the same "buy 7, the 8th's on us"

@@ -75,7 +75,13 @@ Deno.serve(async (req) => {
       .eq("phone", trimmedPhone)
       .eq("access_token", customerToken)
       .maybeSingle();
-    if (!rewardRow || Math.floor(((rewardRow.stamps || 0) + totalFreeQty) / STAMP_GOAL) < totalFreeQty) {
+    // Less whatever another uncollected order's free drink already holds
+    // (place_redeemed_order applies the same rule under its lock).
+    const { data: onHold } = rewardRow
+      ? await supabase.rpc("stamps_on_hold", { p_phone: trimmedPhone })
+      : { data: 0 };
+    const spendableStamps = Math.max((rewardRow?.stamps || 0) - (onHold || 0), 0);
+    if (!rewardRow || Math.floor((spendableStamps + totalFreeQty) / STAMP_GOAL) < totalFreeQty) {
       return new Response(JSON.stringify({ error: "You don't have enough stamps for a free drink yet" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
