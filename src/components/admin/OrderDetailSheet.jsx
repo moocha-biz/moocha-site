@@ -145,12 +145,18 @@ function PaymentField({ order }) {
 }
 
 export default function OrderDetailSheet({ order, onClose }) {
-  const { markOrderCollected, markOrderPreparing, markOrderReady, deleteOrder, refundOrder, showToast } = useMoocha();
+  const { customers, markOrderCollected, markOrderPreparing, markOrderReady, deleteOrder, refundOrder, showToast } = useMoocha();
   const [refunding, setRefunding] = React.useState(false);
   const [marking, setMarking] = React.useState(false);
   const [startingPrep, setStartingPrep] = React.useState(false);
   const [holdingDelete, setHoldingDelete] = React.useState(false);
   const deleteHoldTimer = React.useRef(null);
+  // A preorder whose customer isn't on Telegram gets nothing out of the
+  // Ready step (no DM to send), so staff can hand it over directly the
+  // same way a walk-in is, instead of tapping Mark ready -> Mark collected.
+  const telegramLinked = !!order.phone && (customers || []).some(c => c.phone === order.phone && c.telegram_chat_id);
+  const directCollect = order.status === 'Received' && order.orderType === 'walkin'
+    || (order.status === 'Received' || order.status === 'Preparing') && order.orderType !== 'walkin' && !telegramLinked;
   const canRefund = order.status === 'Received' || order.status === 'Preparing' || order.status === 'Ready' || order.status === 'Collected';
 
   React.useEffect(() => () => clearTimeout(deleteHoldTimer.current), []);
@@ -333,7 +339,7 @@ export default function OrderDetailSheet({ order, onClose }) {
           walk-in customer who's stepping away while it's made (see the
           "Mark ready" button below, now offered for walk-ins too) needs
           it, so it's no longer their only option. */}
-      {order.status === 'Received' && order.orderType === 'walkin' && (
+      {directCollect && (
         <button className="btn-primary" style={{ marginTop: 16 }} onClick={collect}><span>Mark collected</span><span>→</span></button>
       )}
       {/* Staff can flip Received -> Preparing themselves for a customer who
@@ -344,7 +350,7 @@ export default function OrderDetailSheet({ order, onClose }) {
           queue to join) — secondary, not primary, since staff can still
           skip straight to "Mark ready" below without it. */}
       {order.status === 'Received' && order.orderType !== 'walkin' && (
-        <button className="btn-secondary" style={{ marginTop: 16 }} disabled={startingPrep} onClick={startPreparing}>
+        <button className="btn-secondary" style={{ marginTop: directCollect ? 8 : 16 }} disabled={startingPrep} onClick={startPreparing}>
           {startingPrep ? 'Marking preparing…' : 'Mark preparing (customer asked in person)'}
         </button>
       )}
@@ -357,9 +363,9 @@ export default function OrderDetailSheet({ order, onClose }) {
           choice there; primary on its own for a preorder, where it's the
           only way forward from Received/Preparing. */}
       {(order.status === 'Received' || order.status === 'Preparing') && (
-        order.status === 'Received' && order.orderType === 'walkin' ? (
+        directCollect ? (
           <button className="btn-secondary" style={{ marginTop: 8 }} disabled={marking} onClick={ready}>
-            {marking ? 'Marking ready…' : 'Mark ready (notify when I step away)'}
+            {marking ? 'Marking ready…' : order.orderType === 'walkin' ? 'Mark ready (notify when I step away)' : 'Mark ready'}
           </button>
         ) : (
           <button className="btn-primary" style={{ marginTop: order.status === 'Received' ? 8 : 16 }} disabled={marking} onClick={ready}>
