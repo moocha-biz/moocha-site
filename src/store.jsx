@@ -301,7 +301,7 @@ export function MoochaProvider({ children }) {
     if (!sb) {
       const list = getLocal('demo_orders', []);
       const o = list.find(x => x.id === id);
-      if (o && o.status === 'Received') {
+      if (o && (o.status === 'Received' || o.status === 'Preparing' || o.status === 'Ready')) {
         o.status = 'Collected';
         o.collectedAt = new Date().toISOString();
         setLocal('demo_orders', list);
