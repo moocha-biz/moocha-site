@@ -790,12 +790,20 @@ export function MoochaProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
+  // Orders + customers are what another staff device's actions change
+  // (a walk-in can create a customer or move their stamps), so this is
+  // what live updates and tab-refocus refetch. Menu/settings are left to
+  // the full refreshAdminData sweep.
+  const refreshOrdersAndCustomers = useCallback(async () => {
+    const [o, c] = await Promise.all([fetchOrders(), fetchCustomers()]);
+    setOrders(o); setCustomers(c);
+  }, [fetchOrders, fetchCustomers]);
+
   // Live-refreshes the Orders list the moment any order changes — a new
   // preorder/walk-in placed, a customer requesting prep via Telegram, a
   // status update, a refund — instead of only ever updating on a manual
-  // "Refresh" click. Only orders are refetched (not the full
-  // refreshAdminData sweep) since nothing else changes from an order
-  // event. Needs `orders` in the supabase_realtime publication (see
+  // "Refresh" click. Customers are refetched alongside since an order
+  // event can create a customer or change their stamps. Needs `orders` in the supabase_realtime publication (see
   // 20260927090000_realtime_orders_v2.sql). RLS on orders already governs
   // which rows this subscription can see, same as any other read.
   //
@@ -817,6 +825,7 @@ export function MoochaProvider({ children }) {
 
   useEffect(() => {
     if (!isAdmin || !sb) return;
+    let subscribedOnce = false;
     const channel = sb
       .channel('admin-orders-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
@@ -829,11 +838,29 @@ export function MoochaProvider({ children }) {
             playChime();
           }
         }
-        setOrders(await fetchOrders());
+        refreshOrdersAndCustomers();
       })
-      .subscribe();
+      .subscribe((status) => {
+        // A dropped socket (phone asleep, flaky wifi) misses every event
+        // while it's down; on rejoin, catch up on whatever changed. The
+        // first SUBSCRIBED is skipped — the isAdmin effect above already
+        // loaded everything.
+        if (status !== 'SUBSCRIBED') return;
+        if (subscribedOnce) refreshOrdersAndCustomers();
+        subscribedOnce = true;
+      });
     return () => { sb.removeChannel(channel); };
-  }, [isAdmin, fetchOrders]);
+  }, [isAdmin, refreshOrdersAndCustomers]);
+
+  // Backgrounded tabs can have their Realtime socket throttled or killed
+  // without it reporting a rejoin, so also catch up whenever the admin
+  // page comes back into view.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshOrdersAndCustomers(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [isAdmin, refreshOrdersAndCustomers]);
 
   const logOut = useCallback(async () => {
     if (sb) await sb.auth.signOut();
