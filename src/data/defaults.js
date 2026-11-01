@@ -6,6 +6,7 @@ export const DEFAULT_SETTINGS = {
   stallName: "Moocha",
   collectionStart: null,
   collectionEnd: null,
+  preorderOpenAt: null,
   preorderCloseAt: null,
 };
 

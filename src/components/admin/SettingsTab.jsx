@@ -22,6 +22,7 @@ export default function SettingsTab() {
   const [name, setName] = useState(settings.stallName);
   const [collectionStart, setCollectionStart] = useState(toLocalInputValue(settings.collectionStart));
   const [collectionEnd, setCollectionEnd] = useState(toLocalInputValue(settings.collectionEnd));
+  const [openAt, setOpenAt] = useState(toLocalInputValue(settings.preorderOpenAt));
   const [closeAt, setCloseAt] = useState(toLocalInputValue(settings.preorderCloseAt));
   const [ppNew, setPpNew] = useState('');
   const [ppConfirm, setPpConfirm] = useState('');
@@ -32,7 +33,7 @@ export default function SettingsTab() {
   // works because a successful save immediately updates it, so the
   // comparison naturally goes back to "nothing to save" right after.
   const stallInfoDirty = phone !== settings.stallPhone || name !== settings.stallName;
-  const autoCloseDirty = closeAt !== toLocalInputValue(settings.preorderCloseAt);
+  const scheduleDirty = openAt !== toLocalInputValue(settings.preorderOpenAt) || closeAt !== toLocalInputValue(settings.preorderCloseAt);
   const collectionHoursDirty = collectionStart !== toLocalInputValue(settings.collectionStart) || collectionEnd !== toLocalInputValue(settings.collectionEnd);
 
   const togglePayment = async () => {
@@ -48,12 +49,24 @@ export default function SettingsTab() {
     showToast('Settings saved ✓');
   };
 
-  const saveAutoClose = async () => {
-    const next = { ...settings, preorderCloseAt: fromLocalInputValue(closeAt) };
+  // Open and close are saved together so a week's window can be set in one
+  // go — saving them separately would trip over last week's (already
+  // passed) close time when setting next week's open time first.
+  const saveSchedule = async () => {
+    const nextOpen = fromLocalInputValue(openAt);
+    const nextClose = fromLocalInputValue(closeAt);
+    if (nextOpen && nextClose && new Date(nextOpen) >= new Date(nextClose)) {
+      showToast('Auto-open time must be before the auto-close time');
+      return;
+    }
+    const next = { ...settings, preorderOpenAt: nextOpen, preorderCloseAt: nextClose };
     setSettings(next);
     await persistSettings(next);
-    showToast(closeAt ? 'Auto-close time set ✓' : 'Auto-close cleared - orders stay open until you toggle them off');
+    showToast(openAt || closeAt ? 'Schedule saved ✓' : 'Schedule cleared - orders follow the toggle above');
   };
+
+  const now = Date.now();
+  const opensLater = settings.preorderOpenAt && now < new Date(settings.preorderOpenAt).getTime();
 
   const saveCollectionHours = async () => {
     if (!collectionStart || !collectionEnd) { showToast('Set both a start and end time'); return; }
@@ -90,19 +103,30 @@ export default function SettingsTab() {
             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePayment(); } }}
           ><div className="knob" /></div>
         </div>
+        {opensLater && (
+          <div className="section-note" style={{ marginTop: 4 }}>
+            {settings.paymentEnabled
+              ? `Will auto-open at ${new Date(settings.preorderOpenAt).toLocaleString()}`
+              : `Auto-open is set for ${new Date(settings.preorderOpenAt).toLocaleString()}, but the toggle above is off - orders won't open until you turn it on`}
+          </div>
+        )}
         {settings.preorderCloseAt && (
           <div className="section-note" style={{ marginTop: 4 }}>
-            {settings.paymentEnabled && Date.now() < new Date(settings.preorderCloseAt).getTime()
+            {settings.paymentEnabled && now < new Date(settings.preorderCloseAt).getTime()
               ? `Will auto-close at ${new Date(settings.preorderCloseAt).toLocaleString()}`
               : `Auto-close time (${new Date(settings.preorderCloseAt).toLocaleString()}) has passed - orders are closed`}
           </div>
         )}
         <div className="field" style={{ marginTop: 10 }}>
+          <label htmlFor="settings-auto-open">Auto-open preorders at</label>
+          <input id="settings-auto-open" type="datetime-local" value={openAt} onChange={e => setOpenAt(e.target.value)} />
+        </div>
+        <div className="field">
           <label htmlFor="settings-auto-close">Auto-close preorders at</label>
           <input id="settings-auto-close" type="datetime-local" value={closeAt} onChange={e => setCloseAt(e.target.value)} />
         </div>
-        <div className="section-note" style={{ marginTop: -6 }}>Orders close on their own at this time - no need to remember to flip the toggle above. Leave blank and save to remove the cutoff.</div>
-        <button className="btn-secondary" style={{ marginBottom: 0 }} disabled={!autoCloseDirty} onClick={saveAutoClose}>{closeAt ? 'Save auto-close time' : 'Clear auto-close time'}</button>
+        <div className="section-note" style={{ marginTop: -6 }}>Orders open and close on their own at these times while the toggle above is on - no need to remember to flip it. Leave a field blank and save to remove that limit.</div>
+        <button className="btn-secondary" style={{ marginBottom: 0 }} disabled={!scheduleDirty} onClick={saveSchedule}>{openAt || closeAt ? 'Save schedule' : 'Clear schedule'}</button>
       </div>
 
       <div className="settings-section">
