@@ -122,7 +122,7 @@ export function MoochaProvider({ children }) {
     return {
       paymentEnabled: data.payment_enabled, stallPhone: data.stall_phone, stallName: data.stall_name,
       collectionStart: data.collection_start, collectionEnd: data.collection_end,
-      preorderCloseAt: data.preorder_close_at,
+      preorderOpenAt: data.preorder_open_at, preorderCloseAt: data.preorder_close_at,
     };
   }, [noteSupabaseError]);
 
@@ -256,6 +256,7 @@ export function MoochaProvider({ children }) {
     const { error } = await sb.from('settings').update({
       payment_enabled: nextSettings.paymentEnabled,
       stall_phone: nextSettings.stallPhone, stall_name: nextSettings.stallName,
+      preorder_open_at: nextSettings.preorderOpenAt ?? null,
       preorder_close_at: nextSettings.preorderCloseAt,
     }).eq('id', 'main');
     if (error) noteSupabaseError('Saving settings', error);
@@ -886,8 +887,10 @@ export function MoochaProvider({ children }) {
 
   // Recomputed on every render (settings.paymentEnabled changing, or the
   // 8s background poll refreshing settings, both trigger one) — no timer
-  // of its own needed for the cutoff to "take effect" within a few seconds.
-  const ordersOpen = settings.paymentEnabled && (!settings.preorderCloseAt || Date.now() < new Date(settings.preorderCloseAt).getTime());
+  // of its own needed for the scheduled open/cutoff to "take effect".
+  const ordersOpen = settings.paymentEnabled
+    && (!settings.preorderOpenAt || Date.now() >= new Date(settings.preorderOpenAt).getTime())
+    && (!settings.preorderCloseAt || Date.now() < new Date(settings.preorderCloseAt).getTime());
 
   const value = {
     sb,
