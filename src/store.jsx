@@ -385,10 +385,32 @@ export function MoochaProvider({ children }) {
     // Goes through delete_order() rather than a plain table delete so the
     // order gets logged to order_deletions (who deleted it, and a snapshot
     // of what it was) before the row disappears for good.
+    // It also takes back any stamps the order gave and removes the
+    // customer if that leaves nothing of them, hence the customers refetch.
     const { error } = await sb.rpc('delete_order', { p_id: id });
     if (error) noteSupabaseError('Deleting order', error);
-    setOrders(await fetchOrders());
-  }, [fetchOrders, noteSupabaseError]);
+    const [o, c] = await Promise.all([fetchOrders(), fetchCustomers()]);
+    setOrders(o); setCustomers(c);
+  }, [fetchOrders, fetchCustomers, noteSupabaseError]);
+
+  // Fixes a mistyped name/phone on an order. update_order_customer() moves
+  // the order's stamps to the new number and drops the old customer if
+  // nothing is left of them.
+  const updateOrderCustomer = useCallback(async (id, { name, phone }) => {
+    if (!sb) {
+      const list = getLocal('demo_orders', []);
+      const o = list.find(x => x.id === id);
+      if (o) { o.name = name; o.phone = phone; }
+      setLocal('demo_orders', list);
+      setOrders([...list]);
+      return { error: null };
+    }
+    const { error } = await sb.rpc('update_order_customer', { p_id: id, p_name: name, p_phone: phone });
+    if (error) { noteSupabaseError('Editing order', error); return { error: error.message }; }
+    const [o, c] = await Promise.all([fetchOrders(), fetchCustomers()]);
+    setOrders(o); setCustomers(c);
+    return { error: null };
+  }, [fetchOrders, fetchCustomers, noteSupabaseError]);
 
   // Stripe-paid orders go through the refund-order edge function (it's the
   // only place that can actually call stripe.refunds.create, since only it
@@ -910,7 +932,7 @@ export function MoochaProvider({ children }) {
     // backend actions
     fetchOrders, fetchSettings, fetchMenuData, fetchCustomers,
     menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuMoveItem, menuSaveItem,
-    persistSettings, setCollectionHours, deleteOrder, refundOrder, logWalkinOrder, markOrderCollected, markOrderPreparing, markOrderReady,
+    persistSettings, setCollectionHours, deleteOrder, updateOrderCustomer, refundOrder, logWalkinOrder, markOrderCollected, markOrderPreparing, markOrderReady,
     setCustomerStamps, deleteCustomerRecord, generateClaimLink, generateTelegramLinkStaff, requestTelegramLink, fetchTelegramLinkStatus,
     noteSupabaseError,
   };

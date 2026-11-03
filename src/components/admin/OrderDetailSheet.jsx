@@ -2,6 +2,7 @@ import React from 'react';
 import { useMoocha } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
 import { edgeFunctionErrorMessage } from '../../lib/edgeFunctionError.js';
+import { normalizeSgPhone } from '../../lib/phone.js';
 import StatusBadge, { Badge } from './StatusBadge.jsx';
 
 // A paid/logged order only ever exists as a row once payment (or the
@@ -145,12 +146,16 @@ function PaymentField({ order }) {
 }
 
 export default function OrderDetailSheet({ order, onClose }) {
-  const { customers, markOrderCollected, markOrderPreparing, markOrderReady, deleteOrder, refundOrder, showToast } = useMoocha();
+  const { customers, markOrderCollected, markOrderPreparing, markOrderReady, deleteOrder, updateOrderCustomer, refundOrder, showToast } = useMoocha();
   const [refunding, setRefunding] = React.useState(false);
   const [marking, setMarking] = React.useState(false);
   const [startingPrep, setStartingPrep] = React.useState(false);
   const [holdingDelete, setHoldingDelete] = React.useState(false);
   const deleteHoldTimer = React.useRef(null);
+  const [editingCustomer, setEditingCustomer] = React.useState(false);
+  const [savingCustomer, setSavingCustomer] = React.useState(false);
+  const [editName, setEditName] = React.useState(order.name || '');
+  const [editPhone, setEditPhone] = React.useState(order.phone || '');
   // A preorder whose customer isn't on Telegram gets nothing out of the
   // Ready step (no DM to send), so staff can hand it over directly the
   // same way a walk-in is, instead of tapping Mark ready -> Mark collected.
@@ -193,6 +198,25 @@ export default function OrderDetailSheet({ order, onClose }) {
     if (!window.confirm(`Delete order #${order.id}? This can't be undone.`)) return;
     await deleteOrder(order.id);
     showToast('Order deleted ✓');
+    onClose();
+  };
+
+  // For a mistyped name/phone — fixing it here moves the order's stamps to
+  // the right number instead of deleting the order and leaving a stray
+  // customer behind (see update_order_customer).
+  const startEditCustomer = () => {
+    setEditName(order.name || '');
+    setEditPhone(order.phone || '');
+    setEditingCustomer(true);
+  };
+  const saveCustomer = async () => {
+    const phone = editPhone.trim() ? normalizeSgPhone(editPhone) : '';
+    if (phone === null) { showToast('Enter an 8-digit SG mobile number'); return; }
+    setSavingCustomer(true);
+    const { error } = await updateOrderCustomer(order.id, { name: editName.trim(), phone });
+    setSavingCustomer(false);
+    if (error) { showToast(error); return; }
+    showToast('Order updated ✓');
     onClose();
   };
 
@@ -254,7 +278,28 @@ export default function OrderDetailSheet({ order, onClose }) {
 
       <OrderProgress status={order.status} />
 
-      <div className="field"><label>Customer</label><div className="admin-item-name">{order.name || '(no name)'}{order.phone ? ` · ${order.phone}` : ''}</div></div>
+      {!editingCustomer ? (
+        <div className="field">
+          <label>Customer</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+            <div className="admin-item-name">{order.name || '(no name)'}{order.phone ? ` · ${order.phone}` : ''}</div>
+            <span className="edit-link" onClick={startEditCustomer}>Edit</span>
+          </div>
+        </div>
+      ) : (
+        <div className="field">
+          <label htmlFor="order-edit-name">Customer name</label>
+          <input id="order-edit-name" value={editName} onChange={e => setEditName(e.target.value)} />
+          <label htmlFor="order-edit-phone" style={{ marginTop: 10 }}>Phone</label>
+          <input id="order-edit-phone" value={editPhone} onChange={e => setEditPhone(e.target.value)} inputMode="tel" />
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button className="btn-secondary btn-compact" style={{ flex: 1, marginTop: 0 }} disabled={savingCustomer} onClick={() => setEditingCustomer(false)}>Cancel</button>
+            <button className="btn-primary btn-compact" style={{ flex: 1, marginTop: 0, justifyContent: 'center' }} disabled={savingCustomer} onClick={saveCustomer}>
+              <span>{savingCustomer ? 'Saving…' : 'Save'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="field">
         <label>Ordered at</label>
