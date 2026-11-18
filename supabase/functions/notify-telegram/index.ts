@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, status, phone, items")
+      .select("id, status, name, phone, items")
       .eq("id", orderId)
       .maybeSingle();
     if (orderError || !order) {
@@ -92,17 +92,20 @@ Deno.serve(async (req) => {
       return skip("already notified");
     }
 
+    const name = typeof order.name === "string" ? order.name.trim() : "";
+    const greeting = name ? `Hi ${name}! ` : "";
+
     let text: string;
     if (wantStatus === "Preparing") {
       const { data: pos } = await supabase.rpc("get_queue_position", { p_order_id: order.id });
       const ahead = pos?.aheadDrinks ?? null;
       const aheadText = ahead == null ? "" : ahead === 0 ? " You're next!" : ` ${ahead} drink${ahead === 1 ? "" : "s"} ahead of you.`;
-      text = `Your order #${order.id} is being prepared!${aheadText}`;
+      text = `${greeting}Your order #${order.id} is being prepared!${aheadText}`;
     } else {
       const itemsSummary = Array.isArray(order.items)
         ? order.items.map((it: { name?: string; qty?: number }) => `${it.name || "item"} x${it.qty || 1}`).join(", ")
         : "";
-      text = `Your order #${order.id} is ready for pickup!${itemsSummary ? `\n${itemsSummary}` : ""}`;
+      text = `${greeting}Your order #${order.id} is ready for pickup!${itemsSummary ? `\n${itemsSummary}` : ""}`;
     }
 
     if (!(await sendTelegramMessage(customer.telegram_chat_id, text))) {
