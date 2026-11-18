@@ -51,7 +51,7 @@ async function replyWithOrderStatus(chatId: number) {
 
   const { data: order } = await supabase
     .from("orders")
-    .select("id, status")
+    .select("id, status, name")
     .eq("phone", customer.phone)
     .in("status", ["Received", "Preparing", "Ready"])
     .order("date", { ascending: false })
@@ -67,7 +67,8 @@ async function replyWithOrderStatus(chatId: number) {
     return;
   }
   if (order.status === "Ready") {
-    await sendTelegramMessage(chatId, `Order #${order.id} is ready for pickup!`);
+    const name = typeof order.name === "string" ? order.name.trim() : "";
+    await sendTelegramMessage(chatId, `${name ? `Hi ${name}! ` : ""}Order #${order.id} is ready for pickup!`);
     return;
   }
   const { data: pos } = await supabase.rpc("get_queue_position", { p_order_id: order.id });
