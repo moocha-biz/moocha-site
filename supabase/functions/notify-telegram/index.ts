@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, status, phone, items")
+      .select("id, status, name, phone, items")
       .eq("id", orderId)
       .maybeSingle();
     if (orderError || !order) {
@@ -102,7 +102,8 @@ Deno.serve(async (req) => {
       const itemsSummary = Array.isArray(order.items)
         ? order.items.map((it: { name?: string; qty?: number }) => `${it.name || "item"} x${it.qty || 1}`).join(", ")
         : "";
-      text = `Your order #${order.id} is ready for pickup!${itemsSummary ? `\n${itemsSummary}` : ""}`;
+      const name = typeof order.name === "string" ? order.name.trim() : "";
+      text = `${name ? `Hi ${name}! ` : ""}Your order #${order.id} is ready for pickup!${itemsSummary ? `\n${itemsSummary}` : ""}`;
     }
 
     if (!(await sendTelegramMessage(customer.telegram_chat_id, text))) {
