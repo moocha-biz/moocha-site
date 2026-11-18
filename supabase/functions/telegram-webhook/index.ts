@@ -62,19 +62,21 @@ async function replyWithOrderStatus(chatId: number) {
     return;
   }
 
+  const name = typeof order.name === "string" ? order.name.trim() : "";
+  const greeting = name ? `Hi ${name}! ` : "";
+
   if (order.status === "Received") {
-    await sendTelegramMessage(chatId, `Order #${order.id}: received, not started yet. Send /prepare (or tap "Start preparing my order" under Orders) when you're on your way.`);
+    await sendTelegramMessage(chatId, `${greeting}Order #${order.id}: received, not started yet. Send /prepare (or tap "Start preparing my order" under Orders) when you're on your way.`);
     return;
   }
   if (order.status === "Ready") {
-    const name = typeof order.name === "string" ? order.name.trim() : "";
-    await sendTelegramMessage(chatId, `${name ? `Hi ${name}! ` : ""}Order #${order.id} is ready for pickup!`);
+    await sendTelegramMessage(chatId, `${greeting}Order #${order.id} is ready for pickup!`);
     return;
   }
   const { data: pos } = await supabase.rpc("get_queue_position", { p_order_id: order.id });
   const ahead = pos?.aheadDrinks ?? null;
   const aheadText = ahead == null ? "" : ahead === 0 ? " You're next!" : ` ${ahead} drink${ahead === 1 ? "" : "s"} ahead of you.`;
-  await sendTelegramMessage(chatId, `Order #${order.id} is being prepared.${aheadText}`);
+  await sendTelegramMessage(chatId, `${greeting}Order #${order.id} is being prepared.${aheadText}`);
 }
 
 // Core of both prep-trigger paths below: calls request_order_prep for a
