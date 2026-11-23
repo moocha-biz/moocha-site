@@ -1,6 +1,8 @@
 import React from 'react';
-import { useMoocha } from '../../store.jsx';
+import QRCode from 'qrcode';
+import { useMoocha, DEFAULT_SUGAR_LEVELS } from '../../store.jsx';
 import { money } from '../../lib/storage.js';
+import { buildPayNowPayload } from '../../lib/paynow.js';
 import { edgeFunctionErrorMessage } from '../../lib/edgeFunctionError.js';
 import { normalizeSgPhone } from '../../lib/phone.js';
 import StatusBadge, { Badge } from './StatusBadge.jsx';
@@ -62,6 +64,93 @@ function OrderProgress({ status }) {
 function stripeDashboardUrl(sessionId) {
   const mode = sessionId.startsWith('cs_test_') ? 'test/' : '';
   return `https://dashboard.stripe.com/${mode}checkout/sessions/${sessionId}`;
+}
+
+// Change one paid drink on an uncollected order for another (e.g. Hojicha
+// Latte -> Miso Hojicha Latte at the counter) and collect just the price
+// difference. The server re-prices everything (swap_order_item); the
+// numbers here are only to show staff what to collect.
+function SwapDrinkPanel({ order, lineIndex, onDone, onCancel }) {
+  const { menu, swapOrderItem, showToast } = useMoocha();
+  const line = order.items[lineIndex];
+  const paidQty = line.qty - (line.redeemed ? (line.freeQty || 1) : 0);
+  const oldUnit = paidQty > 0 ? line.lineTotal / paidQty : 0;
+  const drinks = Object.values(menu.categories).flat().filter(i => !i.isHidden && !i.soldout);
+  const [itemId, setItemId] = React.useState(null);
+  const [sugar, setSugar] = React.useState(null);
+  const [saving, setSaving] = React.useState(false);
+  const [qr, setQr] = React.useState(null);
+  const item = drinks.find(i => i.id === itemId);
+  const sugarLevels = item ? (item.sugarLevels != null ? item.sugarLevels : DEFAULT_SUGAR_LEVELS) : [];
+  const diff = item ? Math.round((item.price - oldUnit) * 100) / 100 : 0;
+  const unchanged = item && item.id === line.itemId && (sugar || '') === (line.sugar || '');
+
+  const pick = (it) => {
+    const levels = it.sugarLevels != null ? it.sugarLevels : DEFAULT_SUGAR_LEVELS;
+    setItemId(it.id);
+    setSugar(levels.includes(line.sugar) ? line.sugar : (levels.includes('50%') ? '50%' : (levels[0] || null)));
+    setQr(null);
+  };
+
+  const showQr = async () => {
+    try {
+      const url = await QRCode.toDataURL(buildPayNowPayload({ amount: diff, reference: order.id }), { margin: 1, width: 220 });
+      setQr(url);
+    } catch {
+      showToast('Could not generate QR code');
+    }
+  };
+
+  const confirm = async () => {
+    setSaving(true);
+    const { error, amount } = await swapOrderItem(order.id, { lineIndex, itemId, sugar });
+    setSaving(false);
+    if (error) { showToast(error); return; }
+    showToast(amount > 0 ? `Changed - collect ${money(amount)} top-up ✓`
+      : amount < 0 ? `Changed - return ${money(-amount)} to the customer ✓`
+      : 'Drink changed ✓');
+    onDone();
+  };
+
+  return (
+    <div style={{ background: 'var(--paper)', border: '2px solid var(--line)', borderRadius: 14, padding: '12px 14px', margin: '6px 0 10px 0' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brand)', marginBottom: 8 }}>
+        Change 1 × {line.name}{line.sugar ? ` · ${line.sugar}` : ''} ({money(oldUnit)}) to:
+      </div>
+      <div className="opt-row">
+        {drinks.map(it => (
+          <button key={it.id} className={`opt-chip ${itemId === it.id ? 'selected' : ''}`} onClick={() => pick(it)}>{it.name} · {money(it.price)}</button>
+        ))}
+      </div>
+      {sugarLevels.length > 0 && (
+        <div className="opt-row" style={{ marginTop: 10 }}>
+          {sugarLevels.map(level => (
+            <button key={level} className={`opt-chip ${sugar === level ? 'selected' : ''}`} onClick={() => setSugar(level)}>{level}</button>
+          ))}
+        </div>
+      )}
+      {item && !unchanged && (
+        <div className="summary-row total" style={{ marginTop: 10 }}>
+          <span>{diff > 0 ? 'Top up' : diff < 0 ? 'Return to customer' : 'Price difference'}</span>
+          <span>{money(Math.abs(diff))}</span>
+        </div>
+      )}
+      {item && !unchanged && diff > 0 && (qr ? (
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
+          <img src={qr} alt="PayNow QR code" width={220} height={220} style={{ borderRadius: 12, background: '#fff' }} />
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--brand)', marginTop: 6 }}>Scan to pay {money(diff)} via PayNow</div>
+        </div>
+      ) : (
+        <button className="btn-secondary btn-compact" style={{ width: '100%', marginTop: 8 }} onClick={showQr}>Show PayNow QR for {money(diff)}</button>
+      ))}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <button className="btn-secondary btn-compact" style={{ flex: 1, marginTop: 0 }} disabled={saving} onClick={onCancel}>Cancel</button>
+        <button className="btn-primary btn-compact" style={{ flex: 1, marginTop: 0, justifyContent: 'center' }} disabled={saving || !item || unchanged} onClick={confirm}>
+          <span>{saving ? 'Saving…' : diff > 0 ? `Paid ${money(diff)} - change` : 'Change drink'}</span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function DetailRow({ label, value }) {
@@ -156,6 +245,8 @@ export default function OrderDetailSheet({ order, onClose }) {
   const [savingCustomer, setSavingCustomer] = React.useState(false);
   const [editName, setEditName] = React.useState(order.name || '');
   const [editPhone, setEditPhone] = React.useState(order.phone || '');
+  const [swapLine, setSwapLine] = React.useState(null);
+  const canSwap = order.status === 'Received' || order.status === 'Preparing' || order.status === 'Ready';
   // A preorder whose customer isn't on Telegram gets nothing out of the
   // Ready step (no DM to send), so staff can hand it over directly the
   // same way a walk-in is, instead of tapping Mark ready -> Mark collected.
@@ -236,9 +327,13 @@ export default function OrderDetailSheet({ order, onClose }) {
   };
 
   const isRedeemed = (order.items || []).some(it => it.redeemed);
+  // A drink change moves order.total by the top-up, but Stripe only ever
+  // charged the original amount — the top-up was paid at the counter.
+  const changeTotal = (order.itemChanges || []).reduce((s, c) => s + Number(c.amount || 0), 0);
+  const stripeCharged = order.total - changeTotal;
   const refund = async () => {
     const verb = order.stripeSessionId
-      ? `refund ${money(order.total)} via Stripe for`
+      ? `refund ${money(stripeCharged)} via Stripe${changeTotal > 0 ? ` (and return the ${money(changeTotal)} top-up yourself)` : ''} for`
       : isRedeemed ? 'cancel and give back the stamps used on' : 'mark refunded (cash) for';
     if (!window.confirm(`Really ${verb} order #${order.id}? This can't be undone.`)) return;
     setRefunding(true);
@@ -366,16 +461,39 @@ export default function OrderDetailSheet({ order, onClose }) {
         </div>
       )}
 
+      {(order.itemChanges || []).length > 0 && (
+        <div className="field">
+          <label>Drink changes</label>
+          {order.itemChanges.map((c, i) => (
+            <div className="admin-item-name" key={i} style={{ fontSize: 12.5, marginBottom: 4 }}>
+              {c.from} → {c.to}
+              {Number(c.amount) !== 0 ? ` · ${Number(c.amount) > 0 ? 'topped up' : 'returned'} ${money(Math.abs(Number(c.amount)))}` : ''}
+              <br />
+              {c.changedAt ? new Date(c.changedAt).toLocaleString() : ''}
+              {c.changedBy ? ` · ${c.changedBy}` : ''}
+            </div>
+          ))}
+        </div>
+      )}
+
       {order.notes && (
         <div className="field"><label>Notes</label><div className="admin-item-name" style={{ fontWeight: 600 }}>{order.notes}</div></div>
       )}
 
       <div className="section-label" style={{ marginTop: 10 }}>Items</div>
       {(order.items || []).map((it, i) => (
-        <div className="summary-row" key={i}>
-          <span>{it.name}{it.sugar ? ` · ${it.sugar}` : ''} x{it.qty}{it.redeemed ? ` · ${it.freeQty || 1} free` : ''}</span>
-          <span>{money(it.lineTotal)}</span>
-        </div>
+        <React.Fragment key={i}>
+          <div className="summary-row">
+            <span>
+              {it.name}{it.sugar ? ` · ${it.sugar}` : ''} x{it.qty}{it.redeemed ? ` · ${it.freeQty || 1} free` : ''}
+              {canSwap && swapLine == null && it.qty - (it.redeemed ? (it.freeQty || 1) : 0) > 0 && (
+                <span className="edit-link" style={{ marginLeft: 8 }} onClick={() => setSwapLine(i)}>Change</span>
+              )}
+            </span>
+            <span>{money(it.lineTotal)}</span>
+          </div>
+          {swapLine === i && <SwapDrinkPanel order={order} lineIndex={i} onDone={onClose} onCancel={() => setSwapLine(null)} />}
+        </React.Fragment>
       ))}
       <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
 

@@ -110,7 +110,7 @@ export function MoochaProvider({ children }) {
       status: r.status, orderType: r.order_type, collectedAt: r.collected_at, collectedBy: r.collected_by,
       readyAt: r.ready_at, readyBy: r.ready_by, prepRequestedAt: r.prep_requested_at, prepRequestedBy: r.prep_requested_by,
       stripeSessionId: r.stripe_session_id, refundedAt: r.refunded_at, refundedBy: r.refunded_by, refundId: r.refund_id,
-      stockAlert: r.stock_alert, partialRefunds: r.partial_refunds || [],
+      stockAlert: r.stock_alert, partialRefunds: r.partial_refunds || [], itemChanges: r.item_changes || [],
     }));
   }, [noteSupabaseError]);
 
@@ -411,6 +411,21 @@ export function MoochaProvider({ children }) {
     setOrders(o); setCustomers(c);
     return { error: null };
   }, [fetchOrders, fetchCustomers, noteSupabaseError]);
+
+  // Swaps one paid drink on an uncollected order for another (customer
+  // changed their mind at the counter). swap_order_item() prices the new
+  // drink server-side, moves the total by the difference (the top-up),
+  // and moves stock — the new drink always comes out of walk-in stock.
+  const swapOrderItem = useCallback(async (id, { lineIndex, itemId, sugar }) => {
+    if (!sb) return { error: "Changing a drink isn't available in demo mode" };
+    const { data, error } = await sb.rpc('swap_order_item', {
+      p_id: id, p_line_index: lineIndex, p_new_item_id: itemId, p_new_sugar: sugar || '',
+    });
+    if (error) { noteSupabaseError('Changing drink', error); return { error: error.message }; }
+    const [o, m] = await Promise.all([fetchOrders(), fetchMenuData()]);
+    setOrders(o); setMenu(m);
+    return { error: null, amount: Number(data?.amount || 0) };
+  }, [fetchOrders, fetchMenuData, noteSupabaseError]);
 
   // Stripe-paid orders go through the refund-order edge function (it's the
   // only place that can actually call stripe.refunds.create, since only it
@@ -932,7 +947,7 @@ export function MoochaProvider({ children }) {
     // backend actions
     fetchOrders, fetchSettings, fetchMenuData, fetchCustomers,
     menuAddCategory, menuDeleteCategory, menuToggleSoldout, menuToggleHidden, menuDeleteItem, menuMoveItem, menuSaveItem,
-    persistSettings, setCollectionHours, deleteOrder, updateOrderCustomer, refundOrder, logWalkinOrder, markOrderCollected, markOrderPreparing, markOrderReady,
+    persistSettings, setCollectionHours, deleteOrder, updateOrderCustomer, swapOrderItem, refundOrder, logWalkinOrder, markOrderCollected, markOrderPreparing, markOrderReady,
     setCustomerStamps, deleteCustomerRecord, generateClaimLink, generateTelegramLinkStaff, requestTelegramLink, fetchTelegramLinkStatus,
     noteSupabaseError,
   };
