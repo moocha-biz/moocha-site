@@ -103,7 +103,7 @@ function SwapDrinkPanel({ order, lineIndex, onDone, onCancel }) {
 
   const confirm = async () => {
     setSaving(true);
-    const { error, amount } = await swapOrderItem(order.id, { lineIndex, itemId, sugar });
+    const { error, amount } = await swapOrderItem(order.id, { lineIndex, expectedItemId: line.itemId, expectedSugar: line.sugar, itemId, sugar });
     setSaving(false);
     if (error) { showToast(error); return; }
     showToast(amount > 0 ? `Changed - collect ${money(amount)} top-up ✓`

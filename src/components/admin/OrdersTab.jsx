@@ -92,9 +92,9 @@ export default function OrdersTab() {
   // strings) for anything that needs a pivot table — that's what actually
   // saves re-typing versus a screenshot or a raw data dump.
   const exportOrders = () => {
-    // Drink-change top-ups (itemChanges) are settled at the counter, so a
-    // Stripe order's total can be part Stripe, part PayNow/cash. A negative
-    // counter amount is cash handed back for a cheaper drink.
+    // Drink-change top-ups (itemChanges) are settled at the counter by PayNow,
+    // so a Stripe order's total can be part Stripe, part PayNow. A negative
+    // counter amount is money sent back for a cheaper drink.
     const paymentSplit = (o) => {
       const changes = (o.itemChanges || []).reduce((s, c) => s + Number(c.amount || 0), 0);
       if (!o.stripeSessionId) return { stripe: 0, counter: o.total };

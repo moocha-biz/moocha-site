@@ -416,10 +416,12 @@ export function MoochaProvider({ children }) {
   // changed their mind at the counter). swap_order_item() prices the new
   // drink server-side, moves the total by the difference (the top-up),
   // and moves stock — the new drink always comes out of walk-in stock.
-  const swapOrderItem = useCallback(async (id, { lineIndex, itemId, sugar }) => {
+  const swapOrderItem = useCallback(async (id, { lineIndex, expectedItemId, expectedSugar, itemId, sugar }) => {
     if (!sb) return { error: "Changing a drink isn't available in demo mode" };
     const { data, error } = await sb.rpc('swap_order_item', {
-      p_id: id, p_line_index: lineIndex, p_new_item_id: itemId, p_new_sugar: sugar || '',
+      p_id: id, p_line_index: lineIndex,
+      p_expected_item_id: expectedItemId || '', p_expected_sugar: expectedSugar || '',
+      p_new_item_id: itemId, p_new_sugar: sugar || '',
     });
     if (error) { noteSupabaseError('Changing drink', error); return { error: error.message }; }
     const [o, m] = await Promise.all([fetchOrders(), fetchMenuData()]);
