@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, status, stripe_session_id, total")
+      .select("id, status, stripe_session_id, total, item_changes, partial_refunds")
       .eq("id", orderId)
       .maybeSingle();
     if (orderError || !order) {
@@ -82,6 +82,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    // A drink change (swap_order_item) moves orders.total by the price
+    // difference, but that difference is settled at the counter (PayNow /
+    // cash), never on Stripe — Stripe only ever charged the original
+    // amount, which is total minus the logged change amounts.
+    const changeTotal = (order.item_changes || []).reduce(
+      (s: number, c: { amount?: number | string }) => s + Number(c.amount || 0), 0);
+    const stripeCharged = Math.round((Number(order.total) - changeTotal) * 100) / 100;
+
     // A partial refund (staff typed a specific amount, e.g. one missing
     // item) vs. the default full refund of the whole order.
     const isPartial = amount != null;
@@ -93,12 +101,24 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (amountNum > Number(order.total)) {
+      if (amountNum > stripeCharged) {
         return new Response(
-          JSON.stringify({ error: `Can't refund more than the order total ($${Number(order.total).toFixed(2)})` }),
+          JSON.stringify({ error: `Can't refund more than was paid on Stripe ($${stripeCharged.toFixed(2)})` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+    }
+
+    // Full refund normally lets Stripe refund whatever's left on the
+    // charge. But if a drink change already gave the customer money back
+    // in cash (a cheaper drink), refunding the whole Stripe charge would
+    // pay that difference out twice — so cap it at what the order is now
+    // worth, less any partial refunds already made.
+    let fullRefundCents: number | null = null;
+    if (!isPartial && changeTotal < 0) {
+      const partialSum = (order.partial_refunds || []).reduce(
+        (s: number, r: { amount?: number | string }) => s + Number(r.amount || 0), 0);
+      fullRefundCents = Math.max(Math.round((Number(order.total) - partialSum) * 100), 0);
     }
 
     const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
@@ -123,10 +143,12 @@ Deno.serve(async (req) => {
 
     let refund;
     try {
+      if (fullRefundCents === 0) throw new Error("Nothing left to refund on Stripe");
       refund = await stripe.refunds.create(
         {
           payment_intent: paymentIntentId,
-          ...(isPartial ? { amount: Math.round(Number(amount) * 100) } : {}),
+          ...(isPartial ? { amount: Math.round(Number(amount) * 100) }
+            : fullRefundCents != null ? { amount: fullRefundCents } : {}),
         },
         { idempotencyKey }
       );
