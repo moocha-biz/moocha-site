@@ -83,8 +83,8 @@ Deno.serve(async (req) => {
     }
 
     // A drink change (swap_order_item) moves orders.total by the price
-    // difference, but that difference is settled at the counter (PayNow /
-    // cash), never on Stripe — Stripe only ever charged the original
+    // difference, but that difference is settled at the counter by PayNow,
+    // never on Stripe — Stripe only ever charged the original
     // amount, which is total minus the logged change amounts.
     const changeTotal = (order.item_changes || []).reduce(
       (s: number, c: { amount?: number | string }) => s + Number(c.amount || 0), 0);
@@ -110,8 +110,8 @@ Deno.serve(async (req) => {
     }
 
     // Full refund normally lets Stripe refund whatever's left on the
-    // charge. But if a drink change already gave the customer money back
-    // in cash (a cheaper drink), refunding the whole Stripe charge would
+    // charge. But if a drink change already sent the customer money back
+    // by PayNow (a cheaper drink), refunding the whole Stripe charge would
     // pay that difference out twice — so cap it at what the order is now
     // worth, less any partial refunds already made.
     let fullRefundCents: number | null = null;
