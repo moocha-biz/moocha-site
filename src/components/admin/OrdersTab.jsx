@@ -92,6 +92,14 @@ export default function OrdersTab() {
   // strings) for anything that needs a pivot table — that's what actually
   // saves re-typing versus a screenshot or a raw data dump.
   const exportOrders = () => {
+    // Drink-change top-ups (itemChanges) are settled at the counter, so a
+    // Stripe order's total can be part Stripe, part PayNow/cash. A negative
+    // counter amount is cash handed back for a cheaper drink.
+    const paymentSplit = (o) => {
+      const changes = (o.itemChanges || []).reduce((s, c) => s + Number(c.amount || 0), 0);
+      if (!o.stripeSessionId) return { stripe: 0, counter: o.total };
+      return { stripe: Math.round((o.total - changes) * 100) / 100, counter: Math.round(changes * 100) / 100 };
+    };
     const orderRows = filtered.map(o => ({
       'Order #': o.id,
       'Date': new Date(o.date).toLocaleString(),
@@ -103,6 +111,8 @@ export default function OrdersTab() {
       'Items Summary': (o.items || []).map(i => `${i.name}${i.sugar ? ` (${i.sugar})` : ''} x${i.qty}`).join(', '),
       'Item Count': (o.items || []).reduce((s, i) => s + i.qty, 0),
       'Total': o.total,
+      'Paid on Stripe': paymentSplit(o).stripe,
+      'Paid at Counter': paymentSplit(o).counter,
       'Notes': o.notes || '',
       'Stripe Payment ID': o.stripeSessionId || '',
     }));

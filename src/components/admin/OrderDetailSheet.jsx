@@ -333,7 +333,7 @@ export default function OrderDetailSheet({ order, onClose }) {
   const stripeCharged = order.total - changeTotal;
   const refund = async () => {
     const verb = order.stripeSessionId
-      ? `refund ${money(stripeCharged)} via Stripe${changeTotal > 0 ? ` (and return the ${money(changeTotal)} top-up yourself)` : ''} for`
+      ? `refund ${money(changeTotal < 0 ? order.total : stripeCharged)} via Stripe${changeTotal > 0 ? ` (and return the ${money(changeTotal)} top-up yourself)` : ''} for`
       : isRedeemed ? 'cancel and give back the stamps used on' : 'mark refunded (cash) for';
     if (!window.confirm(`Really ${verb} order #${order.id}? This can't be undone.`)) return;
     setRefunding(true);
@@ -349,7 +349,7 @@ export default function OrderDetailSheet({ order, onClose }) {
   // Doesn't close the sheet after, since the order's still active and staff
   // may want to see the updated refund history right away.
   const partialRefund = async () => {
-    const raw = window.prompt(`Partial refund amount for order #${order.id} (max ${money(order.total)}):`);
+    const raw = window.prompt(`Partial refund amount for order #${order.id} (max ${money(stripeCharged)}${changeTotal > 0 ? ' - the top-up was paid at the counter' : ''}):`);
     if (raw == null) return;
     const amount = parseFloat(raw);
     if (!Number.isFinite(amount) || amount <= 0) { showToast('Enter a valid amount'); return; }
